@@ -122,3 +122,38 @@ Whatever gets built must not read as a recommendation to buy a product. The mode
 to "should I insure this?" is a comparison of two plans, and the right framing is *here is
 what this risk costs you and what protection would be worth* — never *you need cover*. The
 disclaimer stays exactly where it is.
+
+
+---
+
+# Built: A and B
+
+**A — the life cover you were already buying is now visible.** Choosing a bequest shows what
+it costs, in the currency people feel: *"The model chooses £137,465, which costs £70,883 set
+aside today and £2,100 a year of your own spending."* That last figure is the price of the
+promise, and it is what life cover for the same sum is worth.
+
+While building it, a related gap turned up. "Let the model decide" was choosing the bequest
+by maximising `(1−φ)·u(ĉ) + φ·u(B/D)` with **φ hard-coded at 0.05** and exposed nowhere. The
+answer is highly sensitive to it — φ = 0.01 gives £117k, φ = 0.30 gives £243k on the same
+household — so the model's "decision" was really an invisible assumption's decision. φ is now
+asked as *how much does leaving something matter to you?* with three settings, and the
+resulting amount updates live.
+
+**B — "what if you could not work?"** A new panel re-runs the whole plan with earnings
+stopping permanently at an age you choose, and reports four things: spending if it happened,
+the annual loss, the cover that would restore the plan, and how many years it would need to
+pay. The state pension is protected in the shock, because incapacity earns credits toward it
+in both countries — without that the loss is double-counted.
+
+The output is the number to shop for, derived from the household's own balance sheet rather
+than a rule of thumb. Two findings worth noting:
+
+- For a median UK household at 35, losing earnings at 40 does not merely reduce spending —
+  it takes discretionary spending **negative**, meaning essentials could not be met.
+- The cover needed is **73–85% of gross salary**, against a market that caps income
+  protection at 50–70%. The panel says so, and quantifies the residual gap. This is exactly
+  the kind of thing a rule of thumb hides.
+
+**C — income protection with real incidence rates** is next, pending disability incidence
+data by age for both countries.

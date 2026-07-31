@@ -25,9 +25,9 @@ function freshState() {
     shape: 1,               // 0 = front-load, 1 = level, 2 = back-load
     smooth: 1,              // 0 = keep steady, 1 = trim, 2 = cut and rebuild
     alpha: 0.4,
-    beqMode: 'none', beqFixed: Math.round(D.salary * 5),
+    beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
-    rf: C.rf, maxAge: 105,
+    rf: C.rf, maxAge: 105, shockAge: 45,
   };
 }
 let S = freshState();
@@ -55,6 +55,11 @@ const ETA_BY_SMOOTH = [0.25, 0.5, 1.0];          // steadier spending = lower EI
    range at 5-40%; the top option goes beyond it for people genuinely paid in
    equity or commission. */
 const EQ_HC_BY_JOB = [0.05, 0.15, 0.30, 0.50];
+/* Weight on the bequest inside the intergenerational aggregator. The research
+   was right that phi has no lay meaning, but "let the model decide" needs one,
+   and leaving it hard-coded meant the model's answer came from a number the
+   user could neither see nor steer. Asked as importance, mapped here. */
+const PHI_BY_WEIGHT = [0.02, 0.08, 0.20];
 /* The spending-shape answer is inverted through the Euler equation. Real
    spending grows at g = ((1+h)/(1+rho))^eta - 1, so a chosen slope implies rho. */
 function rhoFromShape(h, eta) {
@@ -97,7 +102,8 @@ function buildParams() {
     } : { own: false },
     maxAge: S.maxAge, curYear: CY,
     theta, eta, rho: rhoFromShape(h, eta), alpha: S.alpha,
-    beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25, phi: 0.05,
+    beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25,
+    phi: PHI_BY_WEIGHT[S.beqWeight ?? 1],
     // Averaged across the household, weighted by each person's earnings.
     eqHC: (() => {
       const ppl = S.couple ? S.people : [S.people[0]];
@@ -345,9 +351,14 @@ function buildRail() {
     seg(T.qSmooth, T.qSmoothOpts, ()=>S.smooth, v=>S.smooth=v, T.qSmoothHelp, true),
     slider(T.qAnnuity, ()=>S.alpha*100, v=>S.alpha=v/100, 0, 100, 5, v=>v.toFixed(0)+'%',
            T.annNone, T.annAll, ()=>T.annReadout),
+    el('div', { class:'readout', id:'ann-out' }),
     seg(T.qBequest, T.beqOpts, ()=>({none:0,fixed:1,opt:2})[S.beqMode],
         v=>S.beqMode=['none','fixed','opt'][v], T.beqHelp, true),
     S.beqMode === 'fixed' ? fieldMoney(T.beqAmount, ()=>S.beqFixed, v=>S.beqFixed=Math.max(0,v)) : null,
+    S.beqMode === 'opt'
+      ? seg(T.beqWeight, T.beqWeightOpts, ()=>S.beqWeight ?? 1, v=>S.beqWeight=v, T.beqWeightHelp, true)
+      : null,
+    S.beqMode !== 'none' ? el('div', { class:'readout', id:'beq-out' }) : null,
   ].filter(Boolean), true));
 
   rail.appendChild(stepBox(6, T.s6, [
@@ -614,6 +625,39 @@ function drawAlerts(R) {
   document.getElementById('alerts').innerHTML =
     A.map(a=>`<div class="alert ${a.t}"><div><b>${a.h}</b> ${a.b}</div></div>`).join('');
 }
+/* Proposal B: what a permanent loss of earnings would cost, and the cover that
+   would undo it. Deterministic on purpose — it does not claim to know the odds,
+   only the consequence. */
+function drawShock() {
+  const box = document.getElementById('shock-cards');
+  const note = document.getElementById('shock-note');
+  if (!box) return;
+  const p = buildParams();
+  const person = p.people[0];
+  const stop = Math.max(person.age + 1, Math.min(person.pensionAge - 1, S.shockAge));
+  let r;
+  try { r = incomeShock(p, ctx, stop, 0); }
+  catch (e) { box.innerHTML = ''; note.textContent = ''; return; }
+
+  const cards = [
+    { k:T.shockSpend, v:money(r.noCover.CD0), accent:'var(--brick)' },
+    { k:T.shockLoss, v:money(Math.max(0, r.lossPerYear)), accent:'var(--brick)' },
+    { k:T.shockBenefit, v:money(r.benefit), accent:'var(--teal)' },
+    { k:T.shockYears, v:String(Math.max(0, person.pensionAge - stop)), accent:'var(--slate)' },
+  ];
+  box.innerHTML = cards.map(c =>
+    `<div class="stat" style="--accent:${c.accent}">
+       <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
+
+  const gross = p.people.reduce((s, x) => s + Math.max(0, x.salary), 0);
+  const share = gross > 0 ? r.benefit / gross : 0;
+  const marketMax = 0.70;
+  note.innerHTML = r.noCover.CD0 <= 0
+    ? T.shockNoteBroken
+    : fill(T.shockNoteOk, { p: pct(share),
+        gap: money(Math.max(0, r.benefit - gross * marketMax)) });
+}
+
 function drawBalanceSheet(R) {
   const tot = R.F0 + R.H0;
   const pc = v => tot>0 ? pct(v/tot,1) : '—';
@@ -653,10 +697,30 @@ function render() {
 
   lastR = R;
   drawHeadline(R); drawAlerts(R);
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R);
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
+  const beqBox = document.getElementById('beq-out');
+  if (beqBox && S.beqMode !== 'none' && R.beq > 0) {
+    // What the bequest costs, in the currency people actually feel: spending.
+    let noBeq = null;
+    try { noBeq = new Household({ ...buildParams(), beqMode:'none' }, ctx).solve(); } catch (e) {}
+    const perYr = noBeq ? money(noBeq.CD0 - R.CD0) : '—';
+    beqBox.innerHTML = fill(S.beqMode === 'opt' ? T.beqOptReadout : T.beqCostNote,
+      { beq: money(R.beq), cost: money(R.L0Cash), peryr: perYr });
+  } else if (beqBox) beqBox.innerHTML = '';
+
+  // Promote the longevity point: the declining spending line IS the cost of
+  // not insuring against living a long time.
+  const annBox = document.getElementById('ann-out');
+  if (annBox) {
+    const c0 = R.years[0].discConsump;
+    const late = R.years[R.years.length - 11]?.discConsump ?? c0;
+    annBox.innerHTML = T.annReadout + '<br><span style="opacity:.85">' +
+      fill(T.annPathNote, { a: pct(S.alpha), r: pct(c0 > 0 ? late / c0 : 0) }) + '</span>';
+  }
+
   (S.couple ? S.people : [S.people[0]]).forEach((p, i) => {
     const box = document.getElementById('jobrisk-out-' + i);
     if (!box) return;
@@ -705,8 +769,8 @@ function writeURL() {
   put('hr',S.mortgageRate,D.mortgageRate); put('hy',S.mortgageYears,D.mortgageYears);
   put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
-  put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed);
-  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge);
   const s = q.toString();
   history.replaceState(null,'', s ? '?'+s : location.pathname);
 }
@@ -732,8 +796,9 @@ function readURL() {
   num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
   num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
   num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
+  num('sa',v=>S.shockAge=v);
   if (q.has('bq')) S.beqMode=q.get('bq');
-  num('bf',v=>S.beqFixed=v);
+  num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
 }
 
 /* ------------------------------------------------------------------- init */
@@ -749,6 +814,11 @@ function setText() {
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
   set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
+  set('t-shockTitle', T.shockTitle); set('t-shockDesc', T.shockDesc);
+  set('t-shockAgeLabel', T.shockAgeLabel);
+  set('t-shockExplainT', T.shockExplainT); set('shockExplain', T.shockExplain, true);
+  const sa = document.getElementById('shockAge');
+  if (sa && document.activeElement !== sa) sa.value = S.shockAge;
   set('t-assets', T.assets); set('t-liabs', T.liabsNW);
   set('t-explain1', T.explain);
   set('explain1', BUILD.lang === 'cs'
@@ -827,6 +897,14 @@ function init() {
   // Also fires for Ctrl+P and File > Print, not just our button.
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();
+  const sa = document.getElementById('shockAge');
+  if (sa) {
+    sa.value = S.shockAge;
+    sa.addEventListener('input', () => {
+      const v = parseFloat(sa.value);
+      if (Number.isFinite(v)) { S.shockAge = Math.round(Math.max(20, Math.min(80, v))); render(); }
+    });
+  }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
 

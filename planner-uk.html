@@ -278,6 +278,22 @@ footer p{margin:0 0 7px;max-width:90ch}
       </div></div>
     </section>
 
+    <section class="panel" id="panel-shock">
+      <header><h2 id="t-shockTitle"></h2><p class="desc" id="t-shockDesc"></p></header>
+      <div class="pbody">
+        <div class="row2" style="max-width:520px;margin-bottom:14px">
+          <div class="field">
+            <span class="flabel" id="t-shockAgeLabel"></span>
+            <input type="number" id="shockAge" min="20" max="80" step="1">
+          </div>
+        </div>
+        <div class="headline" id="shock-cards" style="margin-bottom:14px"></div>
+        <div class="note" id="shock-note"></div>
+      </div>
+      <details class="explain"><summary id="t-shockExplainT"></summary>
+        <div class="inner" id="shockExplain"></div></details>
+    </section>
+
     <section class="panel">
       <header><h2 id="t-chSurv"></h2><p class="desc" id="t-chSurvD"></p></header>
       <div class="pbody">
@@ -826,7 +842,7 @@ class Household {
   grossIncome(i, t) {
     const person = this.people[i];
     const age = person.age + t;
-    const out = { salary: 0, statePension: 0, employerPension: 0 };
+    const out = { salary: 0, statePension: 0, employerPension: 0, disabilityBenefit: 0 };
     if (age < person.workUntilAge) {
       out.salary = this.ctx.salaryCurve
         ? person.salary * this.ctx.salaryCurve(age, person) / this.ctx.salaryCurve(person.age, person)
@@ -841,6 +857,12 @@ class Household {
         ? person.statePensionOverride
         : this.ctx.statePension(person, this);
     }
+    // Income protection pays between the date earnings stop and pension age.
+    if (person.disabilityBenefit > 0 &&
+        age >= (person.disabilityFrom ?? Infinity) &&
+        age < (person.disabilityTo ?? -Infinity)) {
+      out.disabilityBenefit = person.disabilityBenefit;
+    }
     return out;
   }
 
@@ -851,8 +873,11 @@ class Household {
   netIncome(i, t) {
     const g = this.grossIncome(i, t);
     const deferred = g.employerPension * (1 - (this.p.pensionTaxHaircut || 0));
-    if (!this.ctx.tax) return g.salary + g.statePension + deferred;
-    return this.ctx.tax(g, this.people[i], t, this) + deferred;
+    // UK and Czech income-protection benefits are paid free of income tax when
+    // the policy is personally owned, so the benefit is added net.
+    const benefit = g.disabilityBenefit || 0;
+    if (!this.ctx.tax) return g.salary + g.statePension + deferred + benefit;
+    return this.ctx.tax(g, this.people[i], t, this) + deferred + benefit;
   }
 
   /* --- solve ------------------------------------------------------------- */
@@ -1003,6 +1028,56 @@ class Household {
       cHat: this.consumpConstEquiv(beq, w0SansLI, cx),
     };
   }
+}
+
+/**
+ * "What if I could not work from age X?"
+ *
+ * Re-solves with earnings stopping permanently at `stopAge` for person `who`,
+ * then finds the level annual benefit, payable from that age to their state
+ * pension age, that restores baseline spending. That benefit is the income
+ * protection cover this household actually needs — derived from its own balance
+ * sheet rather than a rule of thumb like "60% of salary".
+ *
+ * Deterministic: it answers "what would it cost" without claiming to know how
+ * likely it is. The probability is layered on separately.
+ */
+function incomeShock(p, ctx, stopAge, who = 0) {
+  const baseline = new Household(p, ctx).solve();
+  const shocked = (benefit) => {
+    const people = p.people.map((person, i) => i !== who ? person : {
+      ...person,
+      workUntilAge: Math.min(person.workUntilAge, stopAge),
+      /* Being unable to work does not wipe out your state pension: the UK
+         credits National Insurance while you are on incapacity benefits, and
+         Czech invalidity counts as an insured period. Pin the record to the
+         career you would have had, or the shock double-counts the loss. */
+      niYears: person.niYears ?? Math.max(0, Math.min(35, person.workUntilAge - 21)),
+      insuredYears: person.insuredYears ?? Math.max(0, Math.min(50, person.workUntilAge - 20)),
+      // The benefit stops at state pension age, as income protection does.
+      disabilityBenefit: benefit,
+      disabilityFrom: stopAge,
+      disabilityTo: person.pensionAge,
+    });
+    return new Household({ ...p, people }, ctx).solve();
+  };
+  const noCover = shocked(0);
+  // Bisect on the benefit that restores baseline spending.
+  let lo = 0, hi = Math.max(1, p.people[who].salary * 3), mid = 0;
+  if (shocked(hi).CD0 < baseline.CD0) return {
+    baseline, noCover, benefit: hi, restored: shocked(hi), capped: true,
+  };
+  for (let k = 0; k < 60; k++) {
+    mid = (lo + hi) / 2;
+    if (shocked(mid).CD0 < baseline.CD0) lo = mid; else hi = mid;
+  }
+  const benefit = (lo + hi) / 2;
+  return {
+    baseline, noCover, benefit, restored: shocked(benefit), capped: false,
+    lossPerYear: baseline.CD0 - noCover.CD0,
+    lossPct: baseline.CD0 > 0 ? (baseline.CD0 - noCover.CD0) / baseline.CD0 : 0,
+    yearsOfCover: Math.max(0, p.people[who].pensionAge - stopAge),
+  };
 }
 
 /** Lifetime cost of fees: what spending would be at zero cost, minus actual. */
@@ -1464,6 +1539,12 @@ en: {
   qBequest: 'Do you want to leave money behind?',
   beqOpts: ['Not a priority', 'A specific amount', 'Let the model decide'],
   beqAmount: 'Amount to leave',
+  beqWeight: 'How much does leaving something matter to you?',
+  beqWeightOpts: ['A little', 'Quite a lot', 'A great deal'],
+  beqWeightHelp: 'The model balances your own spending against what you leave behind. This sets how heavily it weighs the inheritance. Without it the model would still pick a number, but from an assumption you could not see.',
+  beqOptReadout: 'The model chooses <b>{beq}</b>, which costs <b>{cost}</b> set aside today and <b>{peryr}</b> a year of your own spending.',
+  beqCostNote: 'Leaving <b>{beq}</b> costs <b>{cost}</b> in today’s money — about <b>{peryr}</b> a year of spending. That is what life cover for this sum is worth.',
+  annPathNote: 'At <b>{a}</b> annuitised your spending at 95 is <b>{r}</b> of your spending today. Guaranteeing more income for life flattens that line.',
   beqHelp: 'Everything you leave is something you did not spend. The model shows the cost either way.',
 
   fee: 'What you pay in investment charges, per year',
@@ -1497,6 +1578,15 @@ en: {
   chSurvDesc: 'The chance of at least one of you still being here.',
   chSurvSingle: 'Your chance of still being here at each age.',
   bsTitle: 'Today’s balance sheet', bsDesc: 'Everything you own and owe, in economic terms.',
+  shockTitle: 'What if you could not work?',
+  shockDesc: 'Your earnings are the largest thing you own, and the one asset you cannot diversify. This is what happens if they stop.',
+  shockAgeLabel: 'Suppose your earnings stopped for good at age',
+  shockSpend: 'Spending if it happened', shockLoss: 'What you would lose, a year',
+  shockBenefit: 'Cover that would restore your plan', shockYears: 'Years it would need to pay',
+  shockNoteOk: 'That benefit is <b>{p}</b> of your gross salary. Insurers usually cap income protection at 50–70%, so cover at the top of the market would leave you about <b>{gap}</b> a year short — still far better than nothing.',
+  shockNoteBroken: 'Without cover this plan does not survive the shock at all: spending goes negative, meaning your essentials could not be met. The number above is what it would take to stay whole.',
+  shockExplainT: 'How is the cover figure worked out?',
+  shockExplain: '<p>The model re-runs your whole plan with earnings stopping permanently at that age, keeping everything else the same. Your state pension is protected, because being unable to work earns you credits toward it.</p><p>It then searches for the level annual payment, running from that age to your state pension age, that would bring your sustainable spending back to where it is today. That figure is what your own balance sheet says you need — not a rule of thumb like &ldquo;60% of salary&rdquo;.</p><p>It is deliberately a <em>what-if</em>, not a forecast. It says nothing about how likely this is; it says what it would cost you.</p>',
 
   legTotal: 'Total spending, expected', legRange: 'Range of outcomes',
   legFloor: 'Essentials and mortgage', legFloorRent: 'Essential spending', legHC: 'Future earnings',
@@ -1604,6 +1694,12 @@ cs: {
   qBequest: 'Chcete po sobě něco zanechat?',
   beqOpts: ['Není to priorita', 'Konkrétní částku', 'Ať rozhodne model'],
   beqAmount: 'Částka k zanechání',
+  beqWeight: 'Jak moc vám záleží na tom něco zanechat?',
+  beqWeightOpts: ['Trochu', 'Dost', 'Velmi'],
+  beqWeightHelp: 'Model váží vaše vlastní výdaje proti tomu, co zanecháte. Tímto nastavíte, jakou váhu dá dědictví. Bez toho by model částku zvolil taky — ale z předpokladu, který nevidíte.',
+  beqOptReadout: 'Model volí <b>{beq}</b>, což stojí <b>{cost}</b> odloženo dnes a <b>{peryr}</b> ročně z vašich výdajů.',
+  beqCostNote: 'Zanechat <b>{beq}</b> stojí <b>{cost}</b> v dnešních cenách — asi <b>{peryr}</b> ročně z výdajů. Tolik má cenu životní pojistka na tuto částku.',
+  annPathNote: 'Při <b>{a}</b> v rentě jsou vaše výdaje v 95 letech <b>{r}</b> dnešních. Víc zaručeného příjmu na doživotí tuto čáru narovná.',
   beqHelp: 'Všechno, co zanecháte, je něco, co jste neutratili. Model ukáže cenu obou variant.',
 
   fee: 'Poplatky za investice ročně',
@@ -1637,6 +1733,15 @@ cs: {
   chSurvDesc: 'Pravděpodobnost, že alespoň jeden z vás bude naživu.',
   chSurvSingle: 'Pravděpodobnost, že se dožijete každého věku.',
   bsTitle: 'Dnešní bilance', bsDesc: 'Vše, co vlastníte a dlužíte, v ekonomickém smyslu.',
+  shockTitle: 'Co když nebudete moci pracovat?',
+  shockDesc: 'Vaše budoucí příjmy jsou to největší, co máte — a jediné aktivum, které nejde rozložit. Tohle se stane, když skončí.',
+  shockAgeLabel: 'Dejme tomu, že by váš příjem natrvalo skončil ve věku',
+  shockSpend: 'Výdaje, kdyby k tomu došlo', shockLoss: 'Kolik byste ročně ztratili',
+  shockBenefit: 'Pojistné plnění, které plán zachrání', shockYears: 'Kolik let by muselo platit',
+  shockNoteOk: 'To je <b>{p}</b> vaší hrubé mzdy. Pojišťovny obvykle kryjí 50–70 %, takže i nejvyšší dostupné krytí by nechalo asi <b>{gap}</b> ročně nepokrytých — pořád mnohem lepší než nic.',
+  shockNoteBroken: 'Bez pojištění tenhle plán takový výpadek nepřežije: výdaje jdou do minusu, tedy ani nezbytné výdaje by nebyly pokryté. Číslo výše je to, co by bylo potřeba.',
+  shockExplainT: 'Jak se to číslo počítá?',
+  shockExplain: '<p>Model přepočítá celý váš plán s tím, že příjem v daném věku natrvalo skončí, a všechno ostatní nechá stejné. Starobní důchod zůstává, protože doba invalidity se do pojištění započítává.</p><p>Pak hledá takovou roční částku vyplácenou od toho věku do důchodového věku, která vrátí vaše udržitelné výdaje tam, kde jsou dnes. To je částka, kterou říká vaše vlastní bilance — ne poučka typu „60 % mzdy“.</p><p>Je to záměrně <em>co kdyby</em>, ne předpověď. Neříká, jak je to pravděpodobné; říká, kolik by to stálo.</p>',
 
   legTotal: 'Celkové výdaje, očekávané', legRange: 'Rozpětí možných výsledků',
   legFloor: 'Nezbytné výdaje a hypotéka', legFloorRent: 'Nezbytné výdaje', legHC: 'Budoucí příjmy',
@@ -1697,9 +1802,9 @@ function freshState() {
     shape: 1,               // 0 = front-load, 1 = level, 2 = back-load
     smooth: 1,              // 0 = keep steady, 1 = trim, 2 = cut and rebuild
     alpha: 0.4,
-    beqMode: 'none', beqFixed: Math.round(D.salary * 5),
+    beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
-    rf: C.rf, maxAge: 105,
+    rf: C.rf, maxAge: 105, shockAge: 45,
   };
 }
 let S = freshState();
@@ -1727,6 +1832,11 @@ const ETA_BY_SMOOTH = [0.25, 0.5, 1.0];          // steadier spending = lower EI
    range at 5-40%; the top option goes beyond it for people genuinely paid in
    equity or commission. */
 const EQ_HC_BY_JOB = [0.05, 0.15, 0.30, 0.50];
+/* Weight on the bequest inside the intergenerational aggregator. The research
+   was right that phi has no lay meaning, but "let the model decide" needs one,
+   and leaving it hard-coded meant the model's answer came from a number the
+   user could neither see nor steer. Asked as importance, mapped here. */
+const PHI_BY_WEIGHT = [0.02, 0.08, 0.20];
 /* The spending-shape answer is inverted through the Euler equation. Real
    spending grows at g = ((1+h)/(1+rho))^eta - 1, so a chosen slope implies rho. */
 function rhoFromShape(h, eta) {
@@ -1769,7 +1879,8 @@ function buildParams() {
     } : { own: false },
     maxAge: S.maxAge, curYear: CY,
     theta, eta, rho: rhoFromShape(h, eta), alpha: S.alpha,
-    beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25, phi: 0.05,
+    beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25,
+    phi: PHI_BY_WEIGHT[S.beqWeight ?? 1],
     // Averaged across the household, weighted by each person's earnings.
     eqHC: (() => {
       const ppl = S.couple ? S.people : [S.people[0]];
@@ -2017,9 +2128,14 @@ function buildRail() {
     seg(T.qSmooth, T.qSmoothOpts, ()=>S.smooth, v=>S.smooth=v, T.qSmoothHelp, true),
     slider(T.qAnnuity, ()=>S.alpha*100, v=>S.alpha=v/100, 0, 100, 5, v=>v.toFixed(0)+'%',
            T.annNone, T.annAll, ()=>T.annReadout),
+    el('div', { class:'readout', id:'ann-out' }),
     seg(T.qBequest, T.beqOpts, ()=>({none:0,fixed:1,opt:2})[S.beqMode],
         v=>S.beqMode=['none','fixed','opt'][v], T.beqHelp, true),
     S.beqMode === 'fixed' ? fieldMoney(T.beqAmount, ()=>S.beqFixed, v=>S.beqFixed=Math.max(0,v)) : null,
+    S.beqMode === 'opt'
+      ? seg(T.beqWeight, T.beqWeightOpts, ()=>S.beqWeight ?? 1, v=>S.beqWeight=v, T.beqWeightHelp, true)
+      : null,
+    S.beqMode !== 'none' ? el('div', { class:'readout', id:'beq-out' }) : null,
   ].filter(Boolean), true));
 
   rail.appendChild(stepBox(6, T.s6, [
@@ -2286,6 +2402,39 @@ function drawAlerts(R) {
   document.getElementById('alerts').innerHTML =
     A.map(a=>`<div class="alert ${a.t}"><div><b>${a.h}</b> ${a.b}</div></div>`).join('');
 }
+/* Proposal B: what a permanent loss of earnings would cost, and the cover that
+   would undo it. Deterministic on purpose — it does not claim to know the odds,
+   only the consequence. */
+function drawShock() {
+  const box = document.getElementById('shock-cards');
+  const note = document.getElementById('shock-note');
+  if (!box) return;
+  const p = buildParams();
+  const person = p.people[0];
+  const stop = Math.max(person.age + 1, Math.min(person.pensionAge - 1, S.shockAge));
+  let r;
+  try { r = incomeShock(p, ctx, stop, 0); }
+  catch (e) { box.innerHTML = ''; note.textContent = ''; return; }
+
+  const cards = [
+    { k:T.shockSpend, v:money(r.noCover.CD0), accent:'var(--brick)' },
+    { k:T.shockLoss, v:money(Math.max(0, r.lossPerYear)), accent:'var(--brick)' },
+    { k:T.shockBenefit, v:money(r.benefit), accent:'var(--teal)' },
+    { k:T.shockYears, v:String(Math.max(0, person.pensionAge - stop)), accent:'var(--slate)' },
+  ];
+  box.innerHTML = cards.map(c =>
+    `<div class="stat" style="--accent:${c.accent}">
+       <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
+
+  const gross = p.people.reduce((s, x) => s + Math.max(0, x.salary), 0);
+  const share = gross > 0 ? r.benefit / gross : 0;
+  const marketMax = 0.70;
+  note.innerHTML = r.noCover.CD0 <= 0
+    ? T.shockNoteBroken
+    : fill(T.shockNoteOk, { p: pct(share),
+        gap: money(Math.max(0, r.benefit - gross * marketMax)) });
+}
+
 function drawBalanceSheet(R) {
   const tot = R.F0 + R.H0;
   const pc = v => tot>0 ? pct(v/tot,1) : '—';
@@ -2325,10 +2474,30 @@ function render() {
 
   lastR = R;
   drawHeadline(R); drawAlerts(R);
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R);
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
+  const beqBox = document.getElementById('beq-out');
+  if (beqBox && S.beqMode !== 'none' && R.beq > 0) {
+    // What the bequest costs, in the currency people actually feel: spending.
+    let noBeq = null;
+    try { noBeq = new Household({ ...buildParams(), beqMode:'none' }, ctx).solve(); } catch (e) {}
+    const perYr = noBeq ? money(noBeq.CD0 - R.CD0) : '—';
+    beqBox.innerHTML = fill(S.beqMode === 'opt' ? T.beqOptReadout : T.beqCostNote,
+      { beq: money(R.beq), cost: money(R.L0Cash), peryr: perYr });
+  } else if (beqBox) beqBox.innerHTML = '';
+
+  // Promote the longevity point: the declining spending line IS the cost of
+  // not insuring against living a long time.
+  const annBox = document.getElementById('ann-out');
+  if (annBox) {
+    const c0 = R.years[0].discConsump;
+    const late = R.years[R.years.length - 11]?.discConsump ?? c0;
+    annBox.innerHTML = T.annReadout + '<br><span style="opacity:.85">' +
+      fill(T.annPathNote, { a: pct(S.alpha), r: pct(c0 > 0 ? late / c0 : 0) }) + '</span>';
+  }
+
   (S.couple ? S.people : [S.people[0]]).forEach((p, i) => {
     const box = document.getElementById('jobrisk-out-' + i);
     if (!box) return;
@@ -2377,8 +2546,8 @@ function writeURL() {
   put('hr',S.mortgageRate,D.mortgageRate); put('hy',S.mortgageYears,D.mortgageYears);
   put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
-  put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed);
-  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge);
   const s = q.toString();
   history.replaceState(null,'', s ? '?'+s : location.pathname);
 }
@@ -2404,8 +2573,9 @@ function readURL() {
   num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
   num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
   num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
+  num('sa',v=>S.shockAge=v);
   if (q.has('bq')) S.beqMode=q.get('bq');
-  num('bf',v=>S.beqFixed=v);
+  num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
 }
 
 /* ------------------------------------------------------------------- init */
@@ -2421,6 +2591,11 @@ function setText() {
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
   set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
+  set('t-shockTitle', T.shockTitle); set('t-shockDesc', T.shockDesc);
+  set('t-shockAgeLabel', T.shockAgeLabel);
+  set('t-shockExplainT', T.shockExplainT); set('shockExplain', T.shockExplain, true);
+  const sa = document.getElementById('shockAge');
+  if (sa && document.activeElement !== sa) sa.value = S.shockAge;
   set('t-assets', T.assets); set('t-liabs', T.liabsNW);
   set('t-explain1', T.explain);
   set('explain1', BUILD.lang === 'cs'
@@ -2499,6 +2674,14 @@ function init() {
   // Also fires for Ctrl+P and File > Print, not just our button.
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();
+  const sa = document.getElementById('shockAge');
+  if (sa) {
+    sa.value = S.shockAge;
+    sa.addEventListener('input', () => {
+      const v = parseFloat(sa.value);
+      if (Number.isFinite(v)) { S.shockAge = Math.round(Math.max(20, Math.min(80, v))); render(); }
+    });
+  }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
 

@@ -440,7 +440,7 @@ export class Household {
   grossIncome(i, t) {
     const person = this.people[i];
     const age = person.age + t;
-    const out = { salary: 0, statePension: 0, employerPension: 0 };
+    const out = { salary: 0, statePension: 0, employerPension: 0, disabilityBenefit: 0 };
     if (age < person.workUntilAge) {
       out.salary = this.ctx.salaryCurve
         ? person.salary * this.ctx.salaryCurve(age, person) / this.ctx.salaryCurve(person.age, person)
@@ -455,6 +455,12 @@ export class Household {
         ? person.statePensionOverride
         : this.ctx.statePension(person, this);
     }
+    // Income protection pays between the date earnings stop and pension age.
+    if (person.disabilityBenefit > 0 &&
+        age >= (person.disabilityFrom ?? Infinity) &&
+        age < (person.disabilityTo ?? -Infinity)) {
+      out.disabilityBenefit = person.disabilityBenefit;
+    }
     return out;
   }
 
@@ -465,8 +471,11 @@ export class Household {
   netIncome(i, t) {
     const g = this.grossIncome(i, t);
     const deferred = g.employerPension * (1 - (this.p.pensionTaxHaircut || 0));
-    if (!this.ctx.tax) return g.salary + g.statePension + deferred;
-    return this.ctx.tax(g, this.people[i], t, this) + deferred;
+    // UK and Czech income-protection benefits are paid free of income tax when
+    // the policy is personally owned, so the benefit is added net.
+    const benefit = g.disabilityBenefit || 0;
+    if (!this.ctx.tax) return g.salary + g.statePension + deferred + benefit;
+    return this.ctx.tax(g, this.people[i], t, this) + deferred + benefit;
   }
 
   /* --- solve ------------------------------------------------------------- */
@@ -617,6 +626,56 @@ export class Household {
       cHat: this.consumpConstEquiv(beq, w0SansLI, cx),
     };
   }
+}
+
+/**
+ * "What if I could not work from age X?"
+ *
+ * Re-solves with earnings stopping permanently at `stopAge` for person `who`,
+ * then finds the level annual benefit, payable from that age to their state
+ * pension age, that restores baseline spending. That benefit is the income
+ * protection cover this household actually needs — derived from its own balance
+ * sheet rather than a rule of thumb like "60% of salary".
+ *
+ * Deterministic: it answers "what would it cost" without claiming to know how
+ * likely it is. The probability is layered on separately.
+ */
+export function incomeShock(p, ctx, stopAge, who = 0) {
+  const baseline = new Household(p, ctx).solve();
+  const shocked = (benefit) => {
+    const people = p.people.map((person, i) => i !== who ? person : {
+      ...person,
+      workUntilAge: Math.min(person.workUntilAge, stopAge),
+      /* Being unable to work does not wipe out your state pension: the UK
+         credits National Insurance while you are on incapacity benefits, and
+         Czech invalidity counts as an insured period. Pin the record to the
+         career you would have had, or the shock double-counts the loss. */
+      niYears: person.niYears ?? Math.max(0, Math.min(35, person.workUntilAge - 21)),
+      insuredYears: person.insuredYears ?? Math.max(0, Math.min(50, person.workUntilAge - 20)),
+      // The benefit stops at state pension age, as income protection does.
+      disabilityBenefit: benefit,
+      disabilityFrom: stopAge,
+      disabilityTo: person.pensionAge,
+    });
+    return new Household({ ...p, people }, ctx).solve();
+  };
+  const noCover = shocked(0);
+  // Bisect on the benefit that restores baseline spending.
+  let lo = 0, hi = Math.max(1, p.people[who].salary * 3), mid = 0;
+  if (shocked(hi).CD0 < baseline.CD0) return {
+    baseline, noCover, benefit: hi, restored: shocked(hi), capped: true,
+  };
+  for (let k = 0; k < 60; k++) {
+    mid = (lo + hi) / 2;
+    if (shocked(mid).CD0 < baseline.CD0) lo = mid; else hi = mid;
+  }
+  const benefit = (lo + hi) / 2;
+  return {
+    baseline, noCover, benefit, restored: shocked(benefit), capped: false,
+    lossPerYear: baseline.CD0 - noCover.CD0,
+    lossPct: baseline.CD0 > 0 ? (baseline.CD0 - noCover.CD0) / baseline.CD0 : 0,
+    yearsOfCover: Math.max(0, p.people[who].pensionAge - stopAge),
+  };
 }
 
 /** Lifetime cost of fees: what spending would be at zero cost, minus actual. */
