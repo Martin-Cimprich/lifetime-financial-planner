@@ -64,7 +64,7 @@ Delta0 divisor                   29.538367            29.538367   1.20e-16
 W0 net worth                1625207.229845       1625207.229845   4.30e-15
 ```
 
-### Two deliberate departures
+### Three deliberate departures
 
 Both make the same mathematics more accurate rather than different, and both are marked
 `DEVIATION` in the source.
@@ -83,6 +83,14 @@ Both make the same mathematics more accurate rather than different, and both are
    every downstream quantity. Tightened; passing `bisectTol = 1e-8` reproduces the
    workbook bit-for-bit.
 
+3. **The long-only allocation.** The workbook's `ReallocNeg` zeroes negative positions and
+   rescales all the positives proportionally, which scales equity down alongside cash and
+   so moves *away* from the target exposure. It is strictly dominated: in a worked case it
+   landed 124,580 short of the target equity exposure where an all-equity portfolio was
+   only 93,872 short. Replaced with a projection that gets equity as close to target as the
+   budget allows; `reallocNeg` is retained for exact reproduction. This is the difference
+   between telling a young renter to hold 22% in shares and telling them to hold 100%.
+
 ---
 
 ## What was added
@@ -92,7 +100,8 @@ Both make the same mathematics more accurate rather than different, and both are
 | **Couples** | One household with joint survival. It spends while *either* partner is alive, which is why a couple can spend more per person than a single person. Essentials follow the OECD-modified equivalence scale. |
 | **Tax** | Real bands and social contributions, reproduced to the penny against published worked examples. |
 | **Housing** | Your home is not spendable — you have to live somewhere. The mortgage is a liability stream, and spending visibly rises when it is repaid. Optional downsizing releases equity. |
-| **Fees** | Capital market assumptions are quoted *gross* of costs, so a tool that feeds them in raw over-promises. Fees come off the return, and the lifetime cost is a headline figure. |
+| **Fees** | Capital market assumptions are quoted *gross* of costs, so a tool that feeds them in raw over-promises. Fees come off the return, scaled by the share of net worth that is actually financial — nobody pays a platform fee on their salary. |
+| **Job risk** | How share-like your earnings are drives how many shares your savings should hold. A civil servant's income is a bond; a founder's is not. |
 | **Early retirement** | "Stop working at" and "state pension starts at" are separate. Set the first below the second and the model shows the income gap and warns about it. |
 
 ## Country data

@@ -142,6 +142,41 @@ export function deriveCMA(eqHC, globHC, eqLiab, globLiab, rf, bisectTol) {
            sigmaC: logStdDev(kC, Math.sqrt(P[2][2])) };
 }
 
+/**
+ * Long-only projection of the unconstrained net-worth allocation.
+ *
+ * DEVIATION (economic, and deliberate). The workbook's ReallocNeg zeroes the
+ * negative positions and rescales ALL the positives down proportionally. For a
+ * young household that scales the equity holding down alongside the cash, and
+ * so moves AWAY from the target equity exposure: it is strictly dominated by
+ * simply holding everything in equities. In a worked case with 96% of the
+ * balance sheet in human capital, ReallocNeg lands 124,580 short of the target
+ * equity exposure where an all-equity portfolio is only 93,872 short.
+ *
+ * Since theta is defined as the equity share of net worth, the right long-only
+ * answer is to get the EQUITY exposure as close to target as the budget allows,
+ * then put whatever is left where the unconstrained solution wanted it. That is
+ * what this does. `reallocNeg` is kept below so the original workbook can still
+ * be reproduced exactly.
+ *
+ * Input/output: [domestic, global, totalEquity, bonds, cash].
+ */
+export function longOnlyAlloc(unc, Ft, globFrac) {
+  if (!(Ft > 0)) return [0, 0, 0, 0, 0];
+  const wantEq = unc[2];
+  const eq = Math.max(0, Math.min(Ft, wantEq));
+  let rest = Ft - eq;
+  // Whatever is left follows the unconstrained solution's preference between
+  // bonds and cash; where it wanted to be short bonds, long-only means cash.
+  const wantBonds = Math.max(0, unc[3]);
+  const bonds = Math.min(rest, wantBonds);
+  rest -= bonds;
+  const cash = rest;
+  const glob = eq * globFrac, dom = eq - glob;
+  return [dom, glob, eq, bonds, cash];
+}
+
+/** The original workbook's heuristic, retained for exact reproduction. */
 export function reallocNeg(unc) {
   const idx = [0, 1, 3, 4];
   let sumAll = 0, sumPos = 0;
@@ -546,7 +581,9 @@ export class Household {
       const lEq = LR*this.p.eqLiab, lGl = lEq*this.globLiab, lDom = lEq-lGl, lB = LR-lEq;
       const unc = [nwDom-hcDom+lDom, nwGl-hcGl+lGl, 0, 0-hcB+lB, nwCash+LC];
       unc[2] = unc[0] + unc[1];
-      const con = reallocNeg(unc);
+      const con = this.p.constrainedMethod === 'reallocNeg'
+        ? reallocNeg(unc)
+        : longOnlyAlloc(unc, Ft, globFrac);
       const st = Math.sqrt(t);
 
       years.push({

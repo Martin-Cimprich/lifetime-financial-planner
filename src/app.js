@@ -11,9 +11,9 @@ function freshState() {
   return {
     couple: false,
     people: [
-      { age: 35, sex: 1, health: 1, trajectory: 1, salary: D.salary,
+      { age: 35, sex: 1, health: 1, trajectory: 1, jobRisk: 1, salary: D.salary,
         workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate },
-      { age: 35, sex: 2, health: 1, trajectory: 1, salary: Math.round(D.salary * 0.85),
+      { age: 35, sex: 2, health: 1, trajectory: 1, jobRisk: 1, salary: Math.round(D.salary * 0.85),
         workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate },
     ],
     cbar: D.cbar,
@@ -51,6 +51,10 @@ function thetaFromAnswer() {
   return Math.max(0.03, Math.min(3, thetaFromRiskAversion(gamma)));
 }
 const ETA_BY_SMOOTH = [0.25, 0.5, 1.0];          // steadier spending = lower EIS
+/* How share-like a person's earnings are. Idzorek & Kaplan put the typical
+   range at 5-40%; the top option goes beyond it for people genuinely paid in
+   equity or commission. */
+const EQ_HC_BY_JOB = [0.05, 0.15, 0.30, 0.50];
 /* The spending-shape answer is inverted through the Euler equation. Real
    spending grows at g = ((1+h)/(1+rho))^eta - 1, so a chosen slope implies rho. */
 function rhoFromShape(h, eta) {
@@ -94,7 +98,14 @@ function buildParams() {
     maxAge: S.maxAge, curYear: CY,
     theta, eta, rho: rhoFromShape(h, eta), alpha: S.alpha,
     beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25, phi: 0.05,
-    eqHC: 0.2, eqLiab: 0.15, rf: S.rf, fee: S.fee,
+    // Averaged across the household, weighted by each person's earnings.
+    eqHC: (() => {
+      const ppl = S.couple ? S.people : [S.people[0]];
+      const tot = ppl.reduce((s,p)=>s+Math.max(0,p.salary),0);
+      if (!(tot > 0)) return EQ_HC_BY_JOB[ppl[0].jobRisk ?? 1];
+      return ppl.reduce((s,p)=>s+EQ_HC_BY_JOB[p.jobRisk ?? 1]*Math.max(0,p.salary),0)/tot;
+    })(),
+    eqLiab: 0.15, rf: S.rf, fee: S.fee,
     pensionTaxHaircut: C.pensionTaxHaircut,
   };
 }
@@ -116,18 +127,31 @@ const el = (tag, attrs, kids) => {
   for (const c of (kids||[])) if (c) e.appendChild(c);
   return e;
 };
+/* Money fields show thousands separators. A type="number" input cannot, so
+   these are text inputs with a numeric keypad hint. Digits are grouped while
+   the field is idle and left plain while it has focus, so typing is never
+   fought by a reformat mid-keystroke. */
+const groupNum = new Intl.NumberFormat(C.locale, { maximumFractionDigits: 0 });
+const fmtGroup = v => Number.isFinite(v) ? groupNum.format(Math.round(v)) : '';
+const parseGroup = s => {
+  const cleaned = String(s).replace(/[^0-9.,-]/g, '')
+    .replace(/[\s  ]/g, '')
+    .replace(/,/g, (C.locale === 'cs-CZ') ? '.' : '');
+  const n = parseFloat(cleaned.replace(/(\..*)\./g, '$1'));
+  return Number.isFinite(n) ? n : NaN;
+};
+
 function fieldMoney(label, get, set, hint) {
-  const inp = el('input', { type:'number', step:'100', min:'0', 'aria-label':label });
-  inp.value = get();
+  const inp = el('input', { type:'text', inputmode:'numeric', autocomplete:'off',
+                            'aria-label':label });
+  inp.value = fmtGroup(get());
   inp.addEventListener('input', () => {
-    const raw = parseFloat(inp.value);
+    const raw = parseGroup(inp.value);
     if (!Number.isFinite(raw)) return;
     set(Math.max(0, raw)); touched = true; render();
   });
-  inp.addEventListener('change', () => {
-    const cur = get();
-    if (Number.isFinite(cur) && String(cur) !== inp.value) inp.value = cur;
-  });
+  inp.addEventListener('focus', () => { const v = get(); inp.value = Number.isFinite(v) ? String(Math.round(v)) : ''; });
+  inp.addEventListener('blur',  () => { inp.value = fmtGroup(get()); });
   return el('div', { class:'field' }, [
     el('span', { class:'flabel', text:label }),
     el('div', { class:'money' }, [el('span', { class:'cur', text:sym }), inp]),
@@ -230,6 +254,8 @@ function personBlock(i) {
     seg(T.sex, [T.male, T.female], ()=>p.sex-1, v=>p.sex=v+1, T.sexHelp),
     seg(T.health, T.healthOpts, ()=>p.health, v=>p.health=v, T.healthHelp),
     seg(T.trajectory, T.trajOpts, ()=>p.trajectory, v=>p.trajectory=v, T.trajHelp),
+    seg(T.jobRisk, T.jobRiskOpts, ()=>p.jobRisk ?? 1, v=>p.jobRisk=v, T.jobRiskHelp),
+    el('div', { class:'readout', id:'jobrisk-out-'+i }),
     el('div', { class:'row2' }, [
       fieldNum(T.stopWork, ()=>p.workUntilAge, v=>p.workUntilAge=Math.max(p.age, Math.min(85, v)), p.age, 85, 1),
       fieldNum(T.pensionStarts, ()=>p.pensionAge, v=>p.pensionAge=Math.max(50, Math.min(85, v)), 50, 85, 1),
@@ -259,7 +285,8 @@ function buildRail() {
 
   const sav = S.savings;
   rail.appendChild(stepBox(3, T.s3, [
-    fieldMoney(T.essentials, ()=>S.cbar, v=>S.cbar=Math.max(0,v), T.essentialsHelp),
+    fieldMoney(T.essentials, ()=>S.cbar, v=>S.cbar=Math.max(0,v),
+              S.own ? T.essentialsHelp : T.essentialsHelpRent),
     el('div', { class:'field' }, [
       el('span', { class:'flabel', text:T.savings }),
       el('div', { class:'row2' }, [
@@ -273,7 +300,8 @@ function buildRail() {
     ]),
   ], true));
 
-  const homeKids = [ seg(T.ownHome, [T.rent, T.own], ()=>S.own?1:0, v=>S.own=!!v, T.homeHelp) ];
+  const homeKids = [ seg(T.ownHome, [T.rent, T.own], ()=>S.own?1:0, v=>S.own=!!v,
+                        S.own ? T.homeHelp : T.homeHelpRent) ];
   if (S.own) {
     homeKids.push(
       el('div', { class:'row2' }, [
@@ -426,10 +454,11 @@ function drawSpend(R) {
   const teal=CSSVAR('--teal'), brick=CSSVAR('--brick'), ink3=CSSVAR('--ink-3');
   const ys=R.years, x0=ys[0].age, x1=ys[ys.length-1].age;
   const floor = y => y.essentials + y.mortgage;
+  // Scale to the full 5th-95th band so the whole range of outcomes is visible.
   let ymax=0, y95=0;
-  for (const y of ys) { ymax=Math.max(ymax, y.bandsConsump[2]+floor(y), y.totalConsump);
-                        y95=Math.max(y95, y.bandsConsump[0]+floor(y)); }
-  const yT = niceTicks(0, ymax*1.1, 5);
+  for (const y of ys) { y95=Math.max(y95, y.bandsConsump[0]+floor(y));
+                        ymax=Math.max(ymax, y.totalConsump); }
+  const yT = niceTicks(0, Math.max(y95, ymax*1.2)*1.02, 6);
   const F = frame('ch-spend', { x0,x1,y0:0,y1:yT[yT.length-1],H:340 });
   axes(F, { y0:0, yTicks:yT, xTicks:niceTicks(x0,x1,7).filter(v=>v>=x0&&v<=x1), yFmt:moneyK });
   const P = k => ys.map(y=>[y.age, y.bandsConsump[k]+floor(y)]);
@@ -439,9 +468,9 @@ function drawSpend(R) {
   line(F, ys.map(y=>[y.age,y.totalConsump]), teal, 2.25);
   const rt = R.retYear;
   if (rt>0 && rt<=R.maxYear) marker(F, ys[rt].age, T.retire, ink3);
-  if (y95 > yT[yT.length-1]*1.05) note(F, moneyK(y95), teal);
+
   legend('leg-spend',[{color:teal,label:T.legTotal},{color:teal,label:T.legRange,band:true},
-                      {color:brick,label:T.legFloor}]);
+                      {color:brick, label: R.L0Mort > 0 ? T.legFloor : T.legFloorRent}]);
 }
 function drawWealth(R) {
   const teal=CSSVAR('--teal'), amber=CSSVAR('--amber'), brick=CSSVAR('--brick'),
@@ -484,8 +513,11 @@ function drawGlide(R) {
   // Describe the shape the chart actually has rather than assuming it falls.
   let peakIdx = 0;
   ys.forEach((y,i)=>{ if ((y.equityShareCon ?? -1) > (ys[peakIdx].equityShareCon ?? -1)) peakIdx = i; });
-  const humped = peakIdx > 2 && ys[peakIdx].equityShareCon > now.equityShareCon * 1.15;
-  const shape = humped ? fill(T.glideHump, { a: ys[peakIdx].age }) : T.glideFalls;
+  const humped = peakIdx > 2 && (ys[peakIdx].equityShareCon ?? 0) > (now.equityShareCon ?? 0) * 1.15;
+  // Only blame the mortgage if there actually is one.
+  const shape = !humped ? T.glideFalls
+    : (R.L0Mort > 0 ? fill(T.glideHump, { a: ys[peakIdx].age })
+                    : fill(T.glideHumpNoMortgage, { a: ys[peakIdx].age }));
   const fmtShare = v => v == null ? T.noSavingsShort : pct(v);
   document.getElementById('glide-note').innerHTML =
     `<b>${fmtShare(now.equityShareCon)}</b> ${BUILD.lang==='cs'?'dnes':'today'} → ` +
@@ -544,9 +576,6 @@ function drawHeadline(R) {
     { k:T.cardPension, v:moneyK(R._pension), accent:'var(--amber)',
       n:`${C.code} · ${C.taxYear}` },
   ];
-  if (R._fee && R._fee.annualLoss > 0) cards.push(
-    { k:T.cardFees, v:moneyK(R._fee.annualLoss), accent:'var(--brick)',
-      n:`${pct(R._fee.pctLoss,1)} · ${pct(S.fee,2)}` });
   if (S.beqMode !== 'none') cards.push(
     { k:T.cardBequest, v:moneyK(R.beq), accent:'var(--violet)', n:'' });
 
@@ -628,6 +657,13 @@ function render() {
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
+  (S.couple ? S.people : [S.people[0]]).forEach((p, i) => {
+    const box = document.getElementById('jobrisk-out-' + i);
+    if (!box) return;
+    const eq = EQ_HC_BY_JOB[p.jobRisk ?? 1];
+    box.innerHTML = fill(T.jobRiskReadout,
+      { eq: pct(eq), note: eq <= 0.15 ? T.jobRiskNoteLow : T.jobRiskNoteHigh });
+  });
   // Refresh every control's visible state without rebuilding the rail.
   document.querySelectorAll('.field.slider, .field.seg-field').forEach(f => f._update && f._update());
   writeURL();
@@ -658,6 +694,7 @@ function writeURL() {
     const d = D.people[i];
     put(`a${i}`,p.age,d.age); put(`s${i}`,p.sex,d.sex); put(`h${i}`,p.health,d.health);
     put(`j${i}`,p.trajectory,d.trajectory); put(`y${i}`,p.salary,d.salary);
+    put(`k${i}`,p.jobRisk,d.jobRisk);
     put(`w${i}`,p.workUntilAge,d.workUntilAge); put(`p${i}`,p.pensionAge,d.pensionAge);
     put(`e${i}`,p.employerPensionRate,d.employerPensionRate);
   });
@@ -683,6 +720,7 @@ function readURL() {
     const p=S.people[i];
     num(`a${i}`,v=>p.age=v); num(`s${i}`,v=>p.sex=v); num(`h${i}`,v=>p.health=v);
     num(`j${i}`,v=>p.trajectory=v); num(`y${i}`,v=>p.salary=v);
+    num(`k${i}`,v=>p.jobRisk=v);
     num(`w${i}`,v=>p.workUntilAge=v); num(`p${i}`,v=>p.pensionAge=v);
     num(`e${i}`,v=>p.employerPensionRate=v);
   }
@@ -706,7 +744,7 @@ function setText() {
   set('t-sub', T.sub);
   set('t-discb', T.disclaimerBold); set('t-disc', T.disclaimer);
   set('print', T.print); set('share', T.copyLink); set('reset', T.reset); set('theme', T.theme);
-  set('t-chSpend', T.chSpend); set('t-chSpendD', T.chSpendDesc);
+  set('t-chSpend', T.chSpend); set('t-chSpendD', S.own ? T.chSpendDesc : T.chSpendDescRent);
   set('t-chWealth', T.chWealth); set('t-chWealthD', T.chWealthDesc);
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
   set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
@@ -714,10 +752,10 @@ function setText() {
   set('t-assets', T.assets); set('t-liabs', T.liabsNW);
   set('t-explain1', T.explain);
   set('explain1', BUILD.lang === 'cs'
-    ? `<p>Model sečte všechno, co máte — úspory <em>i</em> každou korunu, kterou kdy vyděláte, po zdanění a v dnešních cenách — a odečte všechno, co musíte zaplatit: celoživotní nezbytné výdaje, zbytek hypotéky a případné dědictví. Co zbyde, je vaše <b>čisté jmění</b> v ekonomickém smyslu.</p>
+    ? `<p>Model sečte všechno, co máte — úspory <em>i</em> každou korunu, kterou kdy vyděláte, po zdanění a v dnešních cenách — a odečte všechno, co musíte zaplatit: celoživotní nezbytné výdaje${S.own ? ', zbytek hypotéky' : ''} a případné dědictví. Co zbyde, je vaše <b>čisté jmění</b> v ekonomickém smyslu.</p>
        <p>To pak vydělí číslem, které říká, přes kolik let se musí majetek rozprostřít — s ohledem na pravděpodobnost, že se každého roku dožijete, a na to, jak trpěliví jste. Výsledek je částka, kterou si letos můžete dovolit utratit, aniž byste ošidili svoje budoucí já.</p>
        <p>Protože se budoucí příjmy počítají jako aktivum, může mít mladý člověk s malými úsporami vysoké čisté jmění — a plán mu řekne, ať utrácí víc, než by napovídal stav účtu.</p>`
-    : `<p>The model adds up everything you have — your savings <em>and</em> every pound you will ever earn, after tax and in today's money — then subtracts everything you must pay: a lifetime of essentials, the rest of the mortgage, and any inheritance you have committed to. What is left is your <b>net worth</b> in the economic sense.</p>
+    : `<p>The model adds up everything you have — your savings <em>and</em> every pound you will ever earn, after tax and in today's money — then subtracts everything you must pay: a lifetime of essentials${S.own ? ', the rest of the mortgage' : ''}, and any inheritance you have committed to. What is left is your <b>net worth</b> in the economic sense.</p>
        <p>It then divides that by a number representing how many years your wealth has to stretch across, weighted by the chance you are alive in each of them and by how patient you are. The result is what you can afford to spend this year without leaving your future self short.</p>
        <p>Because future earnings count as an asset, a young person with almost no savings can still have a large net worth — and the plan will tell them to spend more than their bank balance alone suggests.</p>`, true);
 
@@ -752,7 +790,40 @@ function init() {
     catch { b.textContent = 'Ctrl+C'; }
     setTimeout(()=>{ b.textContent = T.copyLink; }, 1800);
   });
-  document.getElementById('print').addEventListener('click', () => window.print());
+  document.getElementById('print').addEventListener('click', () => {
+    fillPrintHeader();
+    /* window.print() is blocked inside the sandboxed frames some hosts use, and
+       throws or silently does nothing. Try it, and if the frame forbids it open
+       a standalone copy in a new tab and print from there. */
+    const framed = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+    let printed = false;
+    if (!framed) {
+      try { window.print(); printed = true; } catch (e) { printed = false; }
+    }
+    // Inside a frame window.print() is often blocked without throwing, so open a
+    // clean standalone copy and print that instead of guessing.
+    if (!printed) {
+      try {
+        const w = window.open('', '_blank');
+        if (w) {
+          w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'
+            + document.title + '</title><style>' + [...document.querySelectorAll('style')]
+              .map(s => s.textContent).join('\n') + '</style></head><body>'
+            + '<div class="printonly" style="display:block">' + document.getElementById('printhead').innerHTML + '</div>'
+            + document.querySelector('main').innerHTML
+            + '<footer>' + document.getElementById('foot').innerHTML + '</footer>'
+            + '</body></html>');
+          w.document.close();
+          w.focus();
+          setTimeout(() => { try { w.print(); } catch (e) {} }, 300);
+        } else if (!printed) {
+          const b = document.getElementById('print');
+          const was = b.textContent; b.textContent = T.printBlocked;
+          setTimeout(() => { b.textContent = was; }, 3500);
+        }
+      } catch (e) { /* nothing more we can do from inside the frame */ }
+    }
+  });
   // Also fires for Ctrl+P and File > Print, not just our button.
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();

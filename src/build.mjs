@@ -25,9 +25,9 @@ const i18n = readFileSync('i18n.js', 'utf8');
 const app  = readFileSync('app.js', 'utf8');
 
 const META = {
-  UK: { lang:'en', file:'planner-uk.html', title:'Lifetime Financial Planner — UK',
+  UK: { lang:'en', file:'../planner-uk.html', title:'Lifetime Financial Planner — UK',
         desc:'How much you can afford to spend, and how to invest it. UK tax, National Insurance, State Pension and ONS life tables.' },
-  CZ: { lang:'cs', file:'planner-cz.html', title:'Finanční plán na celý život — ČR',
+  CZ: { lang:'cs', file:'../planner-cz.html', title:'Finanční plán na celý život — ČR',
         desc:'Kolik si můžete dovolit utrácet a jak investovat. České daně, pojistné, starobní důchod a úmrtnostní tabulky ČSÚ.' },
 };
 for (const cc of Object.keys(META)) {
@@ -39,6 +39,13 @@ for (const cc of Object.keys(META)) {
     .replace('__BUNDLE__', () => bundle)
     .replace('__I18N__', () => i18n)
     .replace('__APP__', () => app);
+  // Refuse to write output that does not parse. A stray escape inside a string
+  // literal is otherwise invisible until the page silently fails to render.
+  const scripts = [...out.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(x => x[1]);
+  scripts.forEach((s, i) => {
+    try { new Function(s); }
+    catch (e) { throw new Error(`${m.file}: inline script ${i} does not parse — ${e.message}`); }
+  });
   writeFileSync(m.file, out);
-  console.log(`${m.file}  ${(out.length/1024).toFixed(0)} KB`);
+  console.log(`${m.file}  ${(out.length/1024).toFixed(0)} KB  (${scripts.length} scripts parse)`);
 }

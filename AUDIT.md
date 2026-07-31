@@ -150,3 +150,43 @@ the old one.
 
 The Czech pension falls because the statutory glide path is now applied; the UK figure
 rises because the mortgage is no longer over-repaid. Both are corrections, not tuning.
+
+
+---
+
+# Round two — user testing
+
+Reported after using the tool on a real scenario.
+
+**The constrained allocation was badly wrong, and it was Kaplan's heuristic.** A renter with
+risk aversion 2 and 96% of their balance sheet in human capital was told to hold 22% of
+savings in shares. The unconstrained answer was 300%. The workbook's `ReallocNeg` zeroes the
+negative positions and rescales *all* the positives proportionally — which scales the equity
+down alongside the cash, moving away from the target rather than toward it.
+
+It is strictly dominated. In that case the target equity exposure was 265,524; `ReallocNeg`
+landed 124,580 short, while simply holding every penny of savings in equities was only
+93,872 short. Since theta is *defined* as the equity share of net worth, the correct
+long-only answer is to get equity as close to target as the budget allows and put the
+remainder where the unconstrained solution wanted it. Replaced with `longOnlyAlloc`;
+`reallocNeg` is retained so the workbook can still be reproduced exactly.
+
+The same household now gets 100% today, gliding to 37% at retirement — the textbook shape
+the model is famous for, which the old heuristic was hiding.
+
+**A renter was told about their mortgage.** Five separate strings assumed a mortgage
+existed: the glide-path explanation, the essentials hint, the housing help, the chart
+description, and the chart legend. All now have renter variants, verified across all four
+country × tenure combinations.
+
+**A build gap let a syntax error ship.** An escaped newline inside a string literal broke
+the whole page, and `build.mjs` happily wrote it because it only checked that the bundle
+*contained* the right pieces. It now parses every inline script and refuses to write if any
+fails. The build also wrote its output into `src/` while the deliverables lived at the repo
+root, so the published files were stale — now fixed.
+
+**Also in this round:** thousands separators in every money field (locale-correct — `39,000`
+in the UK, `518 892` in Czechia), the fees card removed, the spending chart rescaled so the
+full 5th–95th band is visible rather than clipped at the 75th, print made to work inside a
+sandboxed frame by opening a clean standalone copy, and a new "how safe is your income?"
+question driving the human-capital equity exposure that was previously hard-coded at 20%.
