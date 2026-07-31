@@ -1,0 +1,2389 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lifetime Financial Planner — UK</title>
+<meta name="description" content="How much you can afford to spend, and how to invest it. UK tax, National Insurance, State Pension and ONS life tables.">
+
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:#FAF9F6; --surface:#FFF; --surface-2:#F2F1EC; --line:#DFDDD5; --line-soft:#EAE8E1;
+  --ink:#16202B; --ink-2:#4A5763; --ink-3:#77828C;
+  --teal:#0B7A6A; --teal-soft:#D6EBE6; --amber:#9A6511; --amber-soft:#F3E7CE;
+  --brick:#A8452F; --brick-soft:#F5DDD6; --slate:#4C5A6A; --violet:#5A4B8A;
+  --good:#1F7A4D; --warn:#8A6212; --crit:#A8352A; --warn-bg:#FBF2DC; --crit-bg:#FBE4E0;
+  --radius:10px; --radius-sm:6px;
+  --shadow:0 1px 2px rgba(22,32,43,.06),0 4px 16px rgba(22,32,43,.05);
+  --serif: ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono: ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  --rail:400px;
+}
+@media (prefers-color-scheme: dark){:root{
+  --paper:#0E141A; --surface:#151D25; --surface-2:#1B242D; --line:#2B3742; --line-soft:#222D37;
+  --ink:#E6E9EB; --ink-2:#A5B0BA; --ink-3:#7C8892;
+  --teal:#3FBCA6; --teal-soft:#123830; --amber:#D6A445; --amber-soft:#3A2E14;
+  --brick:#E58467; --brick-soft:#3B211A; --slate:#8FA3B8; --violet:#9C8BD0;
+  --good:#4CBB82; --warn:#D9AE52; --crit:#E8796A; --warn-bg:#33290F; --crit-bg:#38201C;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);}}
+:root[data-theme="light"]{color-scheme:light;
+  --paper:#FAF9F6;--surface:#FFF;--surface-2:#F2F1EC;--line:#DFDDD5;--line-soft:#EAE8E1;
+  --ink:#16202B;--ink-2:#4A5763;--ink-3:#77828C;--teal:#0B7A6A;--teal-soft:#D6EBE6;
+  --amber:#9A6511;--amber-soft:#F3E7CE;--brick:#A8452F;--brick-soft:#F5DDD6;--slate:#4C5A6A;
+  --violet:#5A4B8A;--good:#1F7A4D;--warn:#8A6212;--crit:#A8352A;--warn-bg:#FBF2DC;--crit-bg:#FBE4E0;
+  --shadow:0 1px 2px rgba(22,32,43,.06),0 4px 16px rgba(22,32,43,.05);}
+:root[data-theme="dark"]{color-scheme:dark;
+  --paper:#0E141A;--surface:#151D25;--surface-2:#1B242D;--line:#2B3742;--line-soft:#222D37;
+  --ink:#E6E9EB;--ink-2:#A5B0BA;--ink-3:#7C8892;--teal:#3FBCA6;--teal-soft:#123830;
+  --amber:#D6A445;--amber-soft:#3A2E14;--brick:#E58467;--brick-soft:#3B211A;--slate:#8FA3B8;
+  --violet:#9C8BD0;--good:#4CBB82;--warn:#D9AE52;--crit:#E8796A;--warn-bg:#33290F;--crit-bg:#38201C;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:var(--serif);font-weight:600;text-wrap:balance;margin:0;letter-spacing:-.01em}
+a{color:var(--teal)}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:3px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+
+header{border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:40}
+.hwrap{display:flex;align-items:center;gap:16px;padding:11px 22px;max-width:1720px;margin:0 auto}
+.brand h1{font-size:18px;line-height:1.2}
+.brand .sub{font-size:11.5px;color:var(--ink-3)}
+.flagchip{font-size:11px;font-weight:600;letter-spacing:.06em;padding:2px 7px;border-radius:20px;
+  background:var(--teal-soft);color:var(--teal);margin-left:8px;vertical-align:middle}
+.hspace{flex:1}
+.hctl{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+button,select,input{font:inherit;color:inherit}
+.btn{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:var(--radius-sm);
+  padding:6px 11px;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--surface-2);border-color:var(--ink-3)}
+.disclaimer{background:var(--warn-bg);border-bottom:1px solid var(--line);padding:9px 22px;
+  font-size:12.5px;color:var(--ink-2);text-align:center}
+.disclaimer strong{color:var(--ink)}
+
+.shell{display:grid;grid-template-columns:var(--rail) minmax(0,1fr);max-width:1720px;margin:0 auto;align-items:start}
+.rail{border-right:1px solid var(--line);background:var(--surface);padding:0 0 60px;
+  position:sticky;top:56px;max-height:calc(100vh - 56px);overflow-y:auto;overscroll-behavior:contain}
+main{padding:20px 26px 80px;min-width:0}
+
+.step{border-bottom:1px solid var(--line-soft)}
+.step>summary{padding:13px 18px;cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;
+  font-family:var(--serif);font-size:15.5px;font-weight:600}
+.step>summary::-webkit-details-marker{display:none}
+.step>summary::after{content:"";margin-left:auto;width:7px;height:7px;flex:none;
+  border-right:1.5px solid var(--ink-3);border-bottom:1.5px solid var(--ink-3);
+  transform:rotate(45deg) translate(-2px,-2px);transition:transform .18s}
+.step[open]>summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
+.step>summary:hover{background:var(--surface-2)}
+.stepnum{width:21px;height:21px;flex:none;border-radius:50%;background:var(--teal-soft);color:var(--teal);
+  font-family:var(--sans);font-size:11px;font-weight:700;display:grid;place-items:center}
+.stepbody{padding:4px 18px 18px;display:flex;flex-direction:column;gap:16px}
+
+.field{display:flex;flex-direction:column;gap:5px}
+.flabel{font-size:13px;font-weight:550;color:var(--ink);line-height:1.35;display:flex;align-items:baseline;gap:6px}
+.hint{font-size:11.5px;color:var(--ink-3);line-height:1.45}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input[type=number],input[type=text],select:not(.btn){width:100%;padding:7px 9px;border:1px solid var(--line);
+  border-radius:var(--radius-sm);background:var(--paper);font-variant-numeric:tabular-nums}
+input:focus,select:focus{border-color:var(--teal)}
+.money{display:flex}
+.money .cur{display:grid;place-items:center;padding:0 9px;font-size:13px;color:var(--ink-3);
+  border:1px solid var(--line);border-right:none;border-radius:var(--radius-sm) 0 0 var(--radius-sm);background:var(--surface-2)}
+.money input{border-radius:0 var(--radius-sm) var(--radius-sm) 0}
+.suffix{display:grid;place-items:center;padding:0 9px;font-size:13px;color:var(--ink-3);
+  border:1px solid var(--line);border-left:none;border-radius:0 var(--radius-sm) var(--radius-sm) 0;background:var(--surface-2)}
+.withSuffix{display:flex}
+.withSuffix input{border-radius:var(--radius-sm) 0 0 var(--radius-sm)}
+
+.slider .top{display:flex;align-items:baseline;gap:8px}
+.slider .val{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--teal);font-weight:600}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;background:transparent;margin:6px 0 2px;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:var(--line)}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--line)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+  background:var(--teal);border:2px solid var(--surface);margin-top:-6px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--teal);
+  border:2px solid var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3)}
+.readout{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);border-left:2px solid var(--teal);
+  padding:6px 9px;border-radius:0 4px 4px 0}
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden}
+.seg.col{flex-direction:column}
+.seg button{flex:1;padding:6px 5px;font-size:12.5px;background:var(--paper);border:none;
+  border-right:1px solid var(--line);cursor:pointer;color:var(--ink-2);text-align:center}
+.seg.col button{border-right:none;border-bottom:1px solid var(--line);text-align:left;padding:7px 10px}
+.seg button:last-child{border-right:none;border-bottom:none}
+.seg button[aria-pressed=true]{background:var(--teal);color:#fff;font-weight:550}
+.qmark{width:15px;height:15px;flex:none;border-radius:50%;border:1px solid var(--line);background:var(--surface-2);
+  color:var(--ink-3);font-size:10px;font-weight:700;cursor:pointer;display:grid;place-items:center;padding:0;line-height:1}
+.qmark:hover{border-color:var(--teal);color:var(--teal)}
+.help{font-size:11.5px;color:var(--ink-2);background:var(--surface-2);padding:8px 10px;
+  border-radius:var(--radius-sm);line-height:1.5;border:1px solid var(--line-soft)}
+.help[hidden]{display:none}
+.qbox{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--radius-sm);padding:11px 12px}
+.qbox .qt{font-family:var(--serif);font-size:14px;font-weight:600;margin-bottom:5px}
+.qbox .qb{font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-bottom:9px}
+.person{border:1px solid var(--line);border-radius:var(--radius-sm);padding:12px;background:var(--paper)}
+.person h4{font-family:var(--serif);font-size:13.5px;margin:0 0 10px;color:var(--teal)}
+
+.headline{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;
+  box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent,var(--teal))}
+.stat .k{font-size:11.5px;color:var(--ink-3)}
+.stat .v{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1.15;margin-top:3px;
+  font-variant-numeric:tabular-nums;letter-spacing:-.015em}
+.stat .n{font-size:11.5px;color:var(--ink-2);margin-top:3px}
+.stat.hero{grid-column:1/-1;background:var(--teal-soft);border-color:var(--teal)}
+.stat.hero .v{font-size:40px;color:var(--teal)}
+.stat.hero .k{color:var(--ink-2);font-size:12.5px}
+.stat .why{margin-top:8px;font-size:11.5px;background:none;border:none;color:var(--teal);cursor:pointer;
+  padding:0;text-decoration:underline;text-underline-offset:2px}
+.derivation{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);font-size:12px;color:var(--ink-2)}
+.derivation[hidden]{display:none}
+.derivation table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.derivation td{padding:2px 0}
+.derivation td:last-child{text-align:right;font-family:var(--mono);font-size:11.5px}
+.derivation tr.sum td{border-top:1px solid var(--line);font-weight:650;color:var(--ink)}
+.derivation .op{color:var(--ink-3);padding-right:6px}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:18px;
+  box-shadow:var(--shadow);overflow:hidden}
+.panel>header{padding:13px 16px 10px;border-bottom:1px solid var(--line-soft);position:static;background:none}
+.panel h2{font-size:16px}
+.panel .desc{font-size:12.5px;color:var(--ink-2);margin-top:3px;max-width:74ch}
+.pbody{padding:14px 16px 16px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--ink-2);margin-bottom:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.swatch{width:11px;height:11px;border-radius:2px;flex:none}
+.swatch.band{opacity:.28}
+.chartwrap{overflow-x:auto}
+svg.chart{display:block;width:100%;height:auto}
+svg.chart text{font-family:var(--sans);fill:var(--ink-3);font-size:11px}
+svg.chart .grid line{stroke:var(--line-soft)}
+svg.chart .axis line{stroke:var(--line)}
+svg.chart .alab{fill:var(--ink-2)}
+
+table.bs{width:100%;border-collapse:collapse;font-size:13px}
+table.bs th,table.bs td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line-soft)}
+table.bs th:first-child,table.bs td:first-child{text-align:left}
+table.bs thead th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);font-weight:600}
+table.bs td.num{font-variant-numeric:tabular-nums}
+table.bs tr.total td{font-weight:650;border-top:1.5px solid var(--line);border-bottom:none}
+table.bs .neg{color:var(--brick)}
+.bsgrid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.note{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:var(--radius-sm);
+  padding:10px 12px;line-height:1.55}
+.alerts{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.alerts:empty{display:none}
+.alert{display:flex;gap:9px;padding:10px 13px;border-radius:var(--radius-sm);font-size:13px;line-height:1.5;
+  border:1px solid transparent}
+.alert.warn{background:var(--warn-bg);border-color:color-mix(in srgb,var(--warn) 30%,transparent)}
+.alert.crit{background:var(--crit-bg);border-color:color-mix(in srgb,var(--crit) 30%,transparent)}
+details.explain{border-top:1px solid var(--line-soft)}
+details.explain summary{cursor:pointer;padding:11px 16px;font-size:13px;font-weight:550;color:var(--teal);list-style:none}
+details.explain summary::-webkit-details-marker{display:none}
+details.explain summary::before{content:"▸ "}
+details.explain[open] summary::before{content:"▾ "}
+details.explain .inner{padding:0 16px 16px;font-size:13px;color:var(--ink-2);line-height:1.6;max-width:76ch}
+details.explain .inner p{margin:0 0 9px}
+footer{border-top:1px solid var(--line);padding:22px 26px 50px;font-size:12px;color:var(--ink-3);
+  line-height:1.6;max-width:1720px;margin:0 auto}
+footer p{margin:0 0 7px;max-width:90ch}
+.mobonly{display:none}
+.printonly{display:none}
+
+@media (max-width:1120px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;max-height:none;border-right:none;border-bottom:1px solid var(--line);order:2}
+  main{order:1;padding:16px 16px 40px}
+  .bsgrid{grid-template-columns:1fr}
+  .mobonly{display:block}
+  .hwrap{padding:10px 16px}
+}
+@media (max-width:560px){
+  .headline{grid-template-columns:1fr}
+  .stat.hero .v{font-size:32px}
+  .row2{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{
+  body>header,.rail,.disclaimer,.noprint,details.explain{display:none!important}
+  .shell{display:block} main{padding:0}
+  .panel{break-inside:avoid;box-shadow:none;border-color:#ccc}
+  body{background:#fff;font-size:11pt}
+  .printonly{display:block}
+  .headline{grid-template-columns:repeat(2,1fr)}
+  .stat.hero{grid-column:1/-1}
+  a[href]:after{content:""}
+}
+</style>
+
+<header>
+  <div class="hwrap">
+    <div class="brand">
+      <h1 id="t-title"></h1>
+      <span class="sub" id="t-sub"></span>
+    </div>
+    <div class="hspace"></div>
+    <div class="hctl noprint">
+      <button class="btn" id="print"></button>
+      <button class="btn" id="share"></button>
+      <button class="btn" id="reset"></button>
+      <button class="btn" id="theme"></button>
+    </div>
+  </div>
+</header>
+<div class="disclaimer"><strong id="t-discb"></strong> <span id="t-disc"></span></div>
+
+<div class="shell">
+  <aside class="rail noprint" id="rail"></aside>
+  <main>
+    <div class="printonly" id="printhead"></div>
+    <div class="headline" id="headline"></div>
+    <div class="alerts" id="alerts"></div>
+
+    <section class="panel">
+      <header><h2 id="t-chSpend"></h2><p class="desc" id="t-chSpendD"></p></header>
+      <div class="pbody">
+        <div class="legend" id="leg-spend"></div>
+        <div class="chartwrap"><svg class="chart" id="ch-spend" viewBox="0 0 900 340" role="img"></svg></div>
+      </div>
+      <details class="explain"><summary id="t-explain1"></summary><div class="inner" id="explain1"></div></details>
+    </section>
+
+    <section class="panel">
+      <header><h2 id="t-chWealth"></h2><p class="desc" id="t-chWealthD"></p></header>
+      <div class="pbody">
+        <div class="legend" id="leg-wealth"></div>
+        <div class="chartwrap"><svg class="chart" id="ch-wealth" viewBox="0 0 900 340" role="img"></svg></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2 id="t-chGlide"></h2><p class="desc" id="t-chGlideD"></p></header>
+      <div class="pbody">
+        <div class="legend" id="leg-glide"></div>
+        <div class="chartwrap"><svg class="chart" id="ch-glide" viewBox="0 0 900 300" role="img"></svg></div>
+        <div class="note" id="glide-note" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <header><h2 id="t-bsTitle"></h2><p class="desc" id="t-bsDesc"></p></header>
+      <div class="pbody"><div class="bsgrid">
+        <div><div class="eyebrow" id="t-assets" style="margin-bottom:7px"></div><table class="bs" id="bs-assets"></table></div>
+        <div><div class="eyebrow" id="t-liabs" style="margin-bottom:7px"></div><table class="bs" id="bs-liab"></table></div>
+      </div></div>
+    </section>
+
+    <section class="panel">
+      <header><h2 id="t-chSurv"></h2><p class="desc" id="t-chSurvD"></p></header>
+      <div class="pbody">
+        <div class="legend" id="leg-surv"></div>
+        <div class="chartwrap"><svg class="chart" id="ch-surv" viewBox="0 0 900 250" role="img"></svg></div>
+      </div>
+    </section>
+  </main>
+</div>
+<footer id="foot"></footer>
+
+<script>
+"use strict";
+const BUILD = {"country":"UK","lang":"en"};
+</script>
+<script>/* ==== generated at build time from lifetables/engine/countries ==== */
+/* National life tables, generated from official sources. Do not hand-edit. */
+
+/* UK: Office for National Statistics (ONS) — "National life tables: UK" reference tables (workbook nltuk198020223.xlsx), worksheet "2022-2024"; headline fig
+   Period life table, UK, based on data for the years 2022-2024 (three consecutive calendar years, 2022, 2023 and 2024). Published 10 December 
+   Source: https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesunitedkin
+   Published ages 20-100 transcribed verbatim; ages below 20 padded with the
+   age-20 rate (irrelevant to planning) and ages above 100 extrapolated by
+   continuing the observed growth in qx to 1.0 at age 115.
+   Validated: reconstructed e65 matches the published figure to 0.01 years. */
+const UK_LIFE_TABLE = {
+  kind: 'lifetable',
+  source: "Office for National Statistics (ONS) \u2014 \"National life tables: UK\" reference tables (workbook nltuk198020223.xlsx), worksheet \"2022-2024\"; headline figures cross-checked against the bulletin \"National ",
+  url: "https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/lifeexpectancies/datasets/nationallifetablesunitedkingdomreferencetables (direct file: https://www.ons.gov.uk/file?uri=/peo",
+  period: "Period life table, UK, based on data for the years 2022-2024 (three consecutive calendar years, 2022, 2023 and 2024). Pu",
+  qx: {
+    male: [
+    0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457,
+    0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457, 0.000457,
+    0.000457, 0.000509, 0.000519, 0.000553, 0.000536, 0.00054, 0.000642, 0.0006, 0.000679, 0.000737,
+    0.000769, 0.000847, 0.00088, 0.000949, 0.001032, 0.00111, 0.001233, 0.001305, 0.00137, 0.001517,
+    0.001681, 0.001808, 0.00189, 0.002074, 0.002164, 0.002433, 0.002615, 0.002839, 0.003057, 0.003387,
+    0.003711, 0.004011, 0.004278, 0.004552, 0.004928, 0.00532, 0.00574, 0.006253, 0.006728, 0.007236,
+    0.007761, 0.008556, 0.009292, 0.010033, 0.011172, 0.011976, 0.013404, 0.014795, 0.01628, 0.017595,
+    0.019527, 0.021506, 0.023614, 0.025473, 0.027789, 0.030319, 0.033748, 0.037142, 0.042361, 0.046881,
+    0.052665, 0.059666, 0.067996, 0.075244, 0.084093, 0.093857, 0.105364, 0.117996, 0.133099, 0.149453,
+    0.166653, 0.184008, 0.20582, 0.225915, 0.248779, 0.271233, 0.29336, 0.322686, 0.34123, 0.365042,
+    0.402489, 0.43554829, 0.47132298, 0.51003609, 0.55192899, 0.59726285, 0.64632031, 0.6994072, 0.7568545, 0.81902035,
+    0.88629233, 0.95908984, 0.995, 0.995, 0.995, 1,
+    ],
+    female: [
+    0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222,
+    0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222, 0.000222,
+    0.000222, 0.000224, 0.000218, 0.000232, 0.000251, 0.000236, 0.00025, 0.000303, 0.000303, 0.000339,
+    0.000371, 0.000393, 0.000454, 0.000488, 0.000508, 0.000628, 0.000637, 0.000717, 0.00079, 0.000906,
+    0.000961, 0.001065, 0.001184, 0.001208, 0.001366, 0.001385, 0.001553, 0.001777, 0.001911, 0.002106,
+    0.002364, 0.002537, 0.002637, 0.002833, 0.003108, 0.003371, 0.003709, 0.004067, 0.004308, 0.004626,
+    0.005019, 0.005434, 0.006069, 0.006708, 0.007322, 0.007943, 0.008952, 0.009871, 0.010777, 0.01166,
+    0.012715, 0.013834, 0.015504, 0.017044, 0.018775, 0.021032, 0.023225, 0.026162, 0.029884, 0.033517,
+    0.037938, 0.043558, 0.049426, 0.056003, 0.06301, 0.070716, 0.080642, 0.090984, 0.10333, 0.116862,
+    0.134302, 0.152124, 0.170029, 0.188651, 0.207374, 0.227361, 0.2496, 0.272316, 0.298092, 0.317194,
+    0.349105, 0.3803681, 0.41443088, 0.45154405, 0.49198079, 0.53603873, 0.58404214, 0.63634437, 0.69333037, 0.75541959,
+    0.82306904, 0.89677664, 0.97708491, 0.995, 0.995, 1,
+    ],
+  },
+};
+
+/* CZ: Český statistický úřad (ČSÚ) — "Úmrtnostní tabulky za ČR" (Detailed mortality tables for the Czech Republic), dataset OBY04BCR v5, served via the ČSÚ 
+   Period (cross-sectional / "průřezová") life table for the Czech Republic as a whole, single calendar year 2025 — the latest year available. 
+   Source: https://csu.gov.cz/produkty/umrtnostni-tabulky-2021-2025 (product page); https://data.csu.gov.cz/datastat/dash?aPolozka=OBY04B (Da
+   Published ages 20-100 transcribed verbatim; ages below 20 padded with the
+   age-20 rate (irrelevant to planning) and ages above 100 extrapolated by
+   continuing the observed growth in qx to 1.0 at age 115.
+   Validated: reconstructed e65 matches the published figure to 0.01 years. */
+const CZ_LIFE_TABLE = {
+  kind: 'lifetable',
+  source: "\u010cesk\u00fd statistick\u00fd \u00fa\u0159ad (\u010cS\u00da) \u2014 \"\u00damrtnostn\u00ed tabulky za \u010cR\" (Detailed mortality tables for the Czech Republic), dataset OBY04BCR v5, served via the \u010cS\u00da DataStat open-data portal. Published as part of th",
+  url: "https://csu.gov.cz/produkty/umrtnostni-tabulky-2021-2025 (product page)",
+  period: "Period (cross-sectional / \"pr\u016f\u0159ezov\u00e1\") life table for the Czech Republic as a whole, single calendar year 2025 \u2014 the lat",
+  qx: {
+    male: [
+    0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619,
+    0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619, 0.0005619,
+    0.0005619, 0.00062416, 0.00066387, 0.00068525, 0.00069507, 0.00070061, 0.00070946, 0.00072617, 0.00075246, 0.00079015,
+    0.00083888, 0.00089637, 0.00095997, 0.001029, 0.00110373, 0.00118461, 0.00127302, 0.00137093, 0.00147906, 0.00159344,
+    0.00170785, 0.00181917, 0.00193258, 0.00205561, 0.00219463, 0.00235376, 0.00253771, 0.00275009, 0.00299334, 0.00327033,
+    0.00358746, 0.00395439, 0.00438174, 0.00487358, 0.00542986, 0.00604703, 0.0067156, 0.0074196, 0.00814819, 0.00891464,
+    0.00974197, 0.0106582, 0.01169558, 0.01289445, 0.01427749, 0.01584116, 0.01757234, 0.01945814, 0.02148326, 0.02362921,
+    0.02591263, 0.02837445, 0.03106148, 0.03400098, 0.03721596, 0.0406681, 0.04448083, 0.04873939, 0.05351982, 0.05888419,
+    0.06490774, 0.07170496, 0.07940468, 0.08809504, 0.09779724, 0.1082767, 0.11978293, 0.13235827, 0.14603287, 0.16082141,
+    0.17671999, 0.19370326, 0.21172206, 0.23070186, 0.25054235, 0.27111825, 0.29228155, 0.31386516, 0.33568784, 0.35756013,
+    0.37929083, 0.40563466, 0.43380822, 0.46393859, 0.49616168, 0.53062283, 0.56747751, 0.60689194, 0.64904392, 0.69412359,
+    0.74233429, 0.79389349, 0.84903376, 0.90800383, 0.97106968, 1,
+    ],
+    female: [
+    0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671,
+    0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671, 0.00019671,
+    0.00019671, 0.00020076, 0.00020383, 0.00020734, 0.0002124, 0.00021962, 0.00022965, 0.00024297, 0.00025991, 0.00028088,
+    0.00030605, 0.00033533, 0.00036848, 0.0004051, 0.00044446, 0.00048568, 0.00052829, 0.00057189, 0.00061655, 0.0006638,
+    0.00071595, 0.00077527, 0.00084332, 0.00092188, 0.00101184, 0.00111252, 0.00122255, 0.00134146, 0.00146987, 0.0016086,
+    0.00175978, 0.00192674, 0.00211345, 0.00232305, 0.00255862, 0.00282312, 0.00311788, 0.00344326, 0.00379993, 0.00419049,
+    0.00461812, 0.00508766, 0.00560686, 0.00618536, 0.00683222, 0.00755537, 0.0083634, 0.00926532, 0.01027062, 0.0113903,
+    0.01264297, 0.01401104, 0.01558769, 0.01741799, 0.01955157, 0.02204007, 0.02493381, 0.02828609, 0.03215217, 0.0365894,
+    0.04166007, 0.04734927, 0.05379773, 0.06108626, 0.06929813, 0.07851723, 0.08882559, 0.10030019, 0.11300927, 0.12700789,
+    0.14233315, 0.15899916, 0.17699218, 0.19626632, 0.21674037, 0.23829615, 0.26077905, 0.28400079, 0.30774471, 0.33177325,
+    0.35583714, 0.38554771, 0.41773895, 0.452618, 0.49040927, 0.53135592, 0.5757214, 0.62379117, 0.67587452, 0.73230656,
+    0.79345038, 0.8596994, 0.93147987, 0.995, 0.995, 1,
+    ],
+  },
+};
+
+/* ===========================================================================
+   Life-cycle planner engine, v2.
+
+   Generalises the Idzorek-Kaplan parent life-cycle model (Idzorek & Kaplan,
+   "Lifetime Financial Advice", CFA Institute Research Foundation 2024;
+   workbook (c) 2026 Paul D. Kaplan, non-commercial licence) to:
+
+     - real national life tables instead of US-calibrated Gompertz
+     - couples, with joint survival and an equivalence scale
+     - income tax and social contributions
+     - a home: mortgage as a liability stream, optional downsizing
+     - investment fees
+     - early retirement (stop working before the state pension starts)
+
+   With a single person, no tax, no housing, no fees and the original Gompertz
+   mortality, it reduces exactly to the verified v1 engine. That reduction is
+   asserted in the test suite.
+   =========================================================================== */
+
+const MALE = 1, FEMALE = 2;
+
+/* ---------------------------------------------------------------- mortality */
+
+/** Gompertz survival, kept so we can reproduce the original workbook. */
+function gompertzTable(sex, maxAge = 120) {
+  const M = [88.0, 91.0][sex - 1], b = [10.6450483499578, 8.8840011008432][sex - 1];
+  const S = (age) => Math.exp((1 - Math.exp(0)) * Math.exp((age - M) / b));
+  // qx implied by the Gompertz survival curve, age by age
+  const qx = [];
+  for (let a = 0; a <= maxAge; a++) {
+    const sa = Math.exp(-Math.exp((a - M) / b) * (Math.exp(1 / b) - 1) * 0 + 0);
+    qx.push(null);
+  }
+  return { kind: 'gompertz', M, b };
+}
+
+/**
+ * Survival curve for one person.
+ * `table` is either {kind:'gompertz', M, b} or {kind:'lifetable', qx:{male:[],female:[]}}.
+ *
+ * `healthShift` is expressed in YEARS ADDED TO LIFE: positive means healthier
+ * and longer-lived, matching the workbook's deltaM. Both table kinds follow
+ * that sign — the Gompertz path moves the modal age up, the life-table path
+ * reads mortality at a correspondingly younger age.
+ */
+class Mortality {
+  constructor(table, sex, healthShift = 0) {
+    this.table = table; this.sex = sex; this.shift = healthShift;
+  }
+  /** Probability of surviving from exact age `a` to exact age `a + n`. */
+  survive(a, n) {
+    if (n <= 0) return 1;
+    if (this.table.kind === 'gompertz') {
+      const m = this.table.M + this.shift, b = this.table.b;
+      return Math.exp((1 - Math.exp(n / b)) * Math.exp((a - m) / b));
+    }
+    const qx = this.sex === FEMALE ? this.table.qx.female : this.table.qx.male;
+    const last = qx.length - 1;
+    let p = 1;
+    for (let k = 0; k < n; k++) {
+      const idx = Math.min(last, Math.max(0, Math.round(a + k - this.shift)));
+      p *= (1 - qx[idx]);
+      if (p <= 0) return 0;
+    }
+    return p;
+  }
+}
+
+/* ------------------------------------------------------------ capital market */
+
+const ASSET_CLASSES = [
+  { w: 0.17311229703644826, equity: true,  global: false },
+  { w: 0.07419098444419213, equity: true,  global: false },
+  { w: 0.21891677075053934, equity: true,  global: true  },
+  { w: 0.05677302146020211, equity: true,  global: true  },
+  { w: 0.18658453502895422, equity: false, global: false },
+  { w: 0.06219484500965141, equity: false, global: false },
+  { w: 0,                   equity: false, global: false },
+  { w: 0.2282275462700125,  equity: false, global: true  },
+  { w: 0,                   equity: false, global: false },
+];
+
+const COV_MAT = [
+[0.02376613683549868,0.025387590602155768,0.022095420642398368,0.023796450565855668,0.00026538901384189566,0.0014080002352681766,0.0006128493063460156,0.003277444391415615,-0.0001155025704978169],
+[0.025387590602155768,0.032209723217076304,0.026060943787670657,0.029009040631782834,0.00021741024869993344,0.0017576076454239068,0.000978189384051462,0.003493635615966325,-0.00009327761122290896],
+[0.022095420642398368,0.026060943787670657,0.027924078398149844,0.030436819069651018,0.000715254037135101,0.002225632136135404,0.0012617776417456663,0.006135094403300821,-0.0000738138615225124],
+[0.023796450565855668,0.029009040631782834,0.030436819069651018,0.04588627865403846,0.0008900340755303406,0.0028540114178557878,0.0014969439792476035,0.006746124926714032,-0.00008366806127016196],
+[0.00026538901384189566,0.00021741024869993344,0.000715254037135101,0.0008900340755303406,0.0014385631074620893,0.0017323811690892414,0.0012540238156718935,0.001989501544055613,0.00003407501191622874],
+[0.0014080002352681766,0.0017576076454239068,0.002225632136135404,0.0028540114178557878,0.0017323811690892414,0.003379223450395645,0.001546241826955205,0.00294490228825892,0.000020217412122914354],
+[0.0006128493063460156,0.000978189384051462,0.0012617776417456663,0.0014969439792476035,0.0012540238156718935,0.001546241826955205,0.0020104870032966573,0.0017152404876594226,0.000016213522643202647],
+[0.003277444391415615,0.003493635615966325,0.006135094403300821,0.006746124926714032,0.001989501544055613,0.00294490228825892,0.0017152404876594226,0.006944408731689815,0.000019797294038534874],
+[-0.0001155025704978169,-0.00009327761122290896,-0.0000738138615225124,-0.00008366806127016196,0.00003407501191622874,0.000020217412122914354,0.000016213522643202647,0.000019797294038534874,0.000030303799190241333]];
+
+function stockPortfolio() {
+  const s = ASSET_CLASSES.reduce((a, x) => a + (x.equity ? x.w : 0), 0);
+  return ASSET_CLASSES.map(x => (x.equity ? x.w / s : 0));
+}
+function assetMix(eq, glob) {
+  let stockSum = 0, globSum = 0;
+  for (const a of ASSET_CLASSES) if (a.equity) { stockSum += a.w; if (a.global) globSum += a.w; }
+  return ASSET_CLASSES.map(a => {
+    if (!a.equity) return (1 - eq) * a.w / (1 - stockSum);
+    return a.global ? eq * glob * a.w / globSum : eq * (1 - glob) * a.w / (stockSum - globSum);
+  });
+}
+function globalStockFraction() {
+  let s = 0, g = 0;
+  for (const a of ASSET_CLASSES) if (a.equity) { s += a.w; if (a.global) g += a.w; }
+  return g / s;
+}
+const sdStocksFn = (rf, s) => { const o = Math.exp(s * s); return (1 + rf) * o * Math.sqrt(o - 1); };
+function sigmaSDFFn(rf, sd, tol = 1e-13) {
+  let lo = 0, hi = 2 * sd, mid = 0;
+  if ((sdStocksFn(rf, lo) - sd) * (sdStocksFn(rf, hi) - sd) > 0) return NaN;
+  while (0.5 * Math.abs(lo - hi) >= tol) {
+    mid = (lo + hi) / 2;
+    if ((sdStocksFn(rf, mid) - sd) * (sdStocksFn(rf, lo) - sd) < 0) hi = mid; else lo = mid;
+  }
+  return mid;
+}
+function erCovS(covS, rf, sigmaSDF) {
+  const KK = covS / (Math.pow(1 + rf, 2) * Math.exp(sigmaSDF * sigmaSDF));
+  return (1 + rf) * ((1 + Math.sqrt(1 + 4 * KK)) / 2) - 1;
+}
+function logStdDev(er, sd) { const r = sd / (1 + er); return Math.sqrt(Math.log(1 + r * r)); }
+
+/** Discount rates and volatilities implied by the risk exposures. */
+function deriveCMA(eqHC, globHC, eqLiab, globLiab, rf, bisectTol) {
+  const ports = [stockPortfolio(), assetMix(eqHC, globHC), assetMix(eqLiab, globLiab)];
+  const P = [[0,0,0],[0,0,0],[0,0,0]];
+  for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) {
+    let s = 0;
+    for (let i = 0; i < 9; i++) { if (!ports[a][i]) continue;
+      for (let j = 0; j < 9; j++) s += ports[a][i] * COV_MAT[i][j] * ports[b][j]; }
+    P[a][b] = s;
+  }
+  const sdStocks = Math.sqrt(P[0][0]);
+  const sigmaSDF = sigmaSDFFn(rf, sdStocks, bisectTol);
+  const kY = erCovS(P[0][1], rf, sigmaSDF), kC = erCovS(P[0][2], rf, sigmaSDF);
+  return { rf, kY, kC, sigmaSDF, sdStocks, portCovMat: P,
+           sigmaY: logStdDev(kY, Math.sqrt(P[1][1])),
+           sigmaC: logStdDev(kC, Math.sqrt(P[2][2])) };
+}
+
+function reallocNeg(unc) {
+  const idx = [0, 1, 3, 4];
+  let sumAll = 0, sumPos = 0;
+  for (const i of idx) { sumAll += unc[i]; if (unc[i] >= 0) sumPos += unc[i]; }
+  const ratio = sumPos === 0 ? 0 : sumAll / sumPos;
+  const out = [0,0,0,0,0];
+  for (const i of idx) out[i] = unc[i] >= 0 ? ratio * unc[i] : 0;
+  out[2] = out[0] + out[1];
+  return out;
+}
+
+function goldenMax(f, lo, hi, iters = 200) {
+  const gr = (Math.sqrt(5) - 1) / 2;
+  let c = hi - gr*(hi-lo), d = lo + gr*(hi-lo), fc = f(c), fd = f(d);
+  for (let i = 0; i < iters && hi - lo > 1e-12 * Math.max(1, Math.abs(lo)); i++) {
+    if (fc > fd) { hi = d; d = c; fd = fc; c = hi - gr*(hi-lo); fc = f(c); }
+    else         { lo = c; c = d; fc = fd; d = lo + gr*(hi-lo); fd = f(d); }
+  }
+  return (lo + hi) / 2;
+}
+
+const PCTL = [
+  { label:'95th', z: 1.6448536269514715 }, { label:'90th', z: 1.2815515655446006 },
+  { label:'75th', z: 0.6744897501960819 }, { label:'50th', z: 0 },
+  { label:'25th', z:-0.6744897501960819 }, { label:'10th', z:-1.2815515655446006 },
+  { label:'5th',  z:-1.6448536269514726 },
+];
+
+/* ------------------------------------------------------------------ helpers */
+
+/** Level annual payment amortising `balance` over `years` at `rate`. */
+function mortgagePayment(balance, rate, years) {
+  if (balance <= 0 || years <= 0) return 0;
+  if (rate <= 1e-9) return balance / years;
+  return balance * rate / (1 - Math.pow(1 + rate, -years));
+}
+
+/**
+ * OECD-modified equivalence: a couple needs 1.5x what one person needs, so a
+ * survivor's essential spending is 1/1.5 of the couple's.
+ */
+const SINGLE_EQUIV = 1 / 1.5;
+
+/* ================================================================== engine */
+
+class Household {
+  /**
+   * @param {object} p  see DEFAULTS in the country modules for the full shape
+   * @param {object} ctx {mortalityTable, salaryCurve, tax, statePension}
+   */
+  constructor(p, ctx) {
+    this.p = p; this.ctx = ctx;
+    this.people = p.people;
+    this.n = this.people.length;
+    // Horizon runs from the YOUNGEST person's age to the plan's maximum age.
+    this.baseAge = Math.min(...this.people.map(x => x.age));
+    this.maxYear = Math.max(1, p.maxAge - this.baseAge);
+    this.mort = this.people.map(x =>
+      new Mortality(ctx.mortalityTable, x.sex, x.healthShift || 0));
+    // The home/foreign equity split is no longer a user input: everyone is
+    // assumed globally diversified in the reference proportions. It stays a
+    // parameter so the original workbook's settings can be reproduced exactly.
+    this.globHC = p.globHC != null ? p.globHC : globalStockFraction();
+    this.globLiab = p.globLiab != null ? p.globLiab : globalStockFraction();
+    this.cma = p.cma || deriveCMA(p.eqHC, this.globHC, p.eqLiab, this.globLiab,
+                                  p.rf, p.bisectTol);
+    this._af = new Map();
+  }
+
+  /** Age of person i at household year t. */
+  ageAt(i, t) { return this.people[i].age + t; }
+
+  /**
+   * Probability person i is alive at household year t, conditioned on dying by
+   * the plan horizon so that survival reaches exactly zero there. This is the
+   * original workbook's treatment; for a real life table the conditioning is
+   * negligible because survival past 105 is already ~0.
+   */
+  pAlive(i, t) {
+    const key = i * 1e4 + t;
+    this._sc = this._sc || new Map();
+    const hit = this._sc.get(key); if (hit !== undefined) return hit;
+    const person = this.people[i];
+    let out;
+    // Each person is conditioned on THEIR OWN horizon. Using the household
+    // horizon would leave an older partner alive past the plan's maximum age,
+    // because maxYear is measured from the youngest person's age.
+    const ownYears = Math.max(0, this.p.maxAge - person.age);
+    if (t > this.maxYear || t > ownYears) out = 0;
+    else {
+      const raw = this.mort[i].survive(person.age, t);
+      const tail = this.mort[i].survive(person.age, ownYears + 1);
+      out = tail >= 1 ? 0 : (raw - tail) / (1 - tail);
+      if (!(out > 0)) out = 0;
+    }
+    this._sc.set(key, out); return out;
+  }
+
+  /** Probability the household still exists (at least one person alive). */
+  pHousehold(t) {
+    if (this.n === 1) return this.pAlive(0, t);
+    const a = this.pAlive(0, t), b = this.pAlive(1, t);
+    return a + b - a * b;
+  }
+  /** Probability both are alive. */
+  pBoth(t) { return this.n === 1 ? this.pAlive(0, t) : this.pAlive(0, t) * this.pAlive(1, t); }
+
+  /**
+   * Expected essential-spending multiplier in year t, conditional on the
+   * household existing: 1.0 while both are alive, SINGLE_EQUIV once only one is.
+   */
+  equivScale(t) {
+    if (this.n === 1) return 1;
+    const any = this.pHousehold(t);
+    if (any <= 0) return SINGLE_EQUIV;
+    const both = this.pBoth(t);
+    return (both * 1 + (any - both) * SINGLE_EQUIV) / any;
+  }
+
+  /* --- annuitisation ---------------------------------------------------- */
+  retYearOf(i) {
+    const w = this.people[i].workUntilAge;
+    return w > this.people[i].age ? w - this.people[i].age : 0;
+  }
+  /** Household annuitisation starts when the LAST earner stops working. */
+  get retYear() { return Math.max(...this.people.map((_, i) => this.retYearOf(i))); }
+
+  annFactor1Y(t) {
+    if (t <= this.retYear) return 1;
+    const prev = this.pHousehold(t - 1);
+    if (prev <= 0) return 1;
+    const q = this.pHousehold(t) / prev;      // one-year household survival
+    if (q <= 0) return 1;
+    return 1 / (1 - this.p.alpha + this.p.alpha / q);
+  }
+  annFactor(t, v) {
+    if (t >= v) return 1;
+    const key = t * 1e4 + v;
+    const hit = this._af.get(key); if (hit !== undefined) return hit;
+    let f = 1;
+    for (let s = t + 1; s <= v; s++) f *= this.annFactor1Y(s);
+    this._af.set(key, f); return f;
+  }
+  /** Household survival from t to v. */
+  survHH(t, v) {
+    const a = this.pHousehold(t);
+    return a <= 0 ? 0 : this.pHousehold(v) / a;
+  }
+
+  pdv(vec, t, k) {
+    let s = 0;
+    for (let v = t; v <= this.maxYear; v++)
+      s += vec[v] * this.annFactor(t, v) * Math.pow(1 + k, t - v);
+    return s;
+  }
+
+  /* --- preferences ------------------------------------------------------ */
+  static priceFn(th, rf, s) {
+    return Math.pow(1 + rf, th - 1) * Math.exp(0.5 * th * (th - 1) * s * s);
+  }
+  certEquivGross() {
+    const { rf, sigmaSDF } = this.cma, th = this.p.theta;
+    return th === 1
+      ? (1 + rf) * Math.exp(0.5 * sigmaSDF * sigmaSDF) - 1
+      : Math.pow(Household.priceFn(th, rf, sigmaSDF), 1 / (th - 1)) - 1;
+  }
+  /**
+   * Certainty-equivalent return, net of investment charges.
+   *
+   * h is the return on NET WORTH, but charges fall only on the financial
+   * portfolio — nobody pays a platform fee on their future salary. Taking the
+   * headline fee straight off h would therefore charge it against human
+   * capital too, overstating the lifetime cost several-fold for a young
+   * household whose balance sheet is mostly future earnings. The drag is
+   * scaled by the share of net worth that is actually financial, averaged over
+   * the plan and weighted by survival. Pass feeScope:'total' for the naive
+   * whole-balance-sheet treatment.
+   */
+  certEquiv() {
+    const gross = this.certEquivGross();
+    const fee = this.p.fee || 0;
+    if (fee <= 0) return gross;
+    if (this.p.feeScope === 'total' || this.p._probe) return gross - fee;
+    return gross - fee * this.financialShareOfNetWorth();
+  }
+  /** Survival-weighted average of financial wealth as a share of net worth. */
+  financialShareOfNetWorth() {
+    if (this._finShare != null) return this._finShare;
+    this._finShare = 1;                    // provisional, so the probe terminates
+    let num = 0, den = 0;
+    try {
+      const probe = new Household({ ...this.p, fee: 0, _probe: true }, this.ctx);
+      for (const y of probe.solve().years) {
+        const w = y.survHousehold;
+        if (!(w > 0) || !Number.isFinite(y.netWorth) || y.netWorth <= 0) continue;
+        num += w * Math.max(0, Math.min(1, y.finWealth / y.netWorth));
+        den += w;
+      }
+    } catch { /* fall back to charging the fee on the whole balance sheet */ }
+    this._finShare = den > 0 ? num / den : 1;
+    return this._finShare;
+  }
+  growthRate(h) { return Math.pow((1 + h) / (1 + this.p.rho), this.p.eta) - 1; }
+
+  consumpDiv(t, h) {
+    if (t > this.maxYear) return 0;
+    const g = this.growthRate(h), fac = (1 + g) / (1 + h), eta = this.p.eta;
+    let s = 0;
+    for (let v = t; v <= this.maxYear; v++)
+      s += Math.pow(this.survHH(t, v), eta) * Math.pow(this.annFactor(t, v), 1 - eta)
+         * Math.pow(fac, v - t);
+    return s;
+  }
+  ivaFn(t, v, g) {
+    return Math.pow(this.survHH(t, v) / this.annFactor(t, v), this.p.eta)
+         * Math.pow(1 + g, v - t);
+  }
+
+  /** Price of permanent life cover per unit of benefit, paid when the household ends. */
+  liPerm(t) {
+    const rf = this.cma.rf;
+    let s = 0;
+    for (let v = t + 1; v <= this.maxYear + 1; v++) {
+      const a = v - 1 <= this.maxYear ? this.survHH(t, v - 1) : 0;
+      const b = v <= this.maxYear ? this.survHH(t, v) : 0;
+      s += (a - b) * Math.pow(1 + rf, t - v);
+    }
+    return s;
+  }
+
+  /* --- bequest (numerically stable forms) -------------------------------- */
+  consumpConstEquiv(beq, w0SansLI, ctx) {
+    const { D0, W, wSum, IV, liPerm0 } = ctx;
+    const cd0 = (w0SansLI - beq * liPerm0) / D0;
+    if (cd0 <= 0) return 1e-9;
+    const eta = this.p.eta;
+    if (eta === 1) {
+      let u = 0;
+      for (let t = 0; t < W.length; t++) u += W[t] * Math.log(IV[t] * cd0);
+      return Math.exp(u / wSum);
+    }
+    const pw = (eta - 1) / eta;
+    let s = 0;
+    for (let t = 0; t < W.length; t++) s += W[t] * Math.pow(IV[t] * cd0, pw);
+    return Math.pow(s / wSum, 1 / pw);
+  }
+  intergenUtil(beq, cHat, beqDiv) {
+    const { gamma, phi } = this.p;
+    if (gamma === 1) return (1 - phi) * Math.log(cHat) + phi * Math.log(beq / beqDiv);
+    const pw = (gamma - 1) / gamma;
+    return ((1 - phi) * Math.pow(cHat, pw) + phi * Math.pow(beq / beqDiv, pw)) / pw;
+  }
+
+  /* --- cash-flow construction -------------------------------------------- */
+
+  /**
+   * Gross income for person i in household year t, split into its sources.
+   * Working income stops at workUntilAge; the state pension starts at
+   * pensionAge. The gap between them is the early-retirement problem.
+   */
+  grossIncome(i, t) {
+    const person = this.people[i];
+    const age = person.age + t;
+    const out = { salary: 0, statePension: 0, employerPension: 0 };
+    if (age < person.workUntilAge) {
+      out.salary = this.ctx.salaryCurve
+        ? person.salary * this.ctx.salaryCurve(age, person) / this.ctx.salaryCurve(person.age, person)
+        : person.salary;
+      // The employer's pension contribution is money you would not otherwise
+      // receive, so it belongs in human capital. Your own contribution is not
+      // extra income — it only moves money between pots — so it is excluded.
+      out.employerPension = out.salary * (person.employerPensionRate || 0);
+    }
+    if (age >= person.pensionAge) {
+      out.statePension = person.statePensionOverride != null
+        ? person.statePensionOverride
+        : this.ctx.statePension(person, this);
+    }
+    return out;
+  }
+
+  /**
+   * After-tax income for person i in year t. Employer pension contributions
+   * are added net of the tax expected when the pot is eventually drawn.
+   */
+  netIncome(i, t) {
+    const g = this.grossIncome(i, t);
+    const deferred = g.employerPension * (1 - (this.p.pensionTaxHaircut || 0));
+    if (!this.ctx.tax) return g.salary + g.statePension + deferred;
+    return this.ctx.tax(g, this.people[i], t, this) + deferred;
+  }
+
+  /* --- solve ------------------------------------------------------------- */
+  solve() {
+    const T = this.maxYear, { rf, kY, kC, sigmaY, sigmaC } = this.cma;
+    const h = this.p.h != null ? this.p.h : this.certEquiv();
+    const g = this.growthRate(h);
+
+    // --- income, essentials, mortgage, windfalls -------------------------
+    const incVec = new Array(T + 1).fill(0);
+    const incGross = new Array(T + 1).fill(0);
+    const essVec = new Array(T + 1).fill(0);
+    const mortVec = new Array(T + 1).fill(0);
+    const windfall = new Array(T + 1).fill(0);
+
+    const H = this.p.housing || {};
+    const mPay = H.own ? mortgagePayment(H.mortgageBalance || 0,
+                                         H.mortgageRate || 0,
+                                         H.mortgageYearsLeft || 0) : 0;
+
+    for (let t = 0; t <= T; t++) {
+      for (let i = 0; i < this.n; i++) {
+        // Income is weighted by the earner still being alive; with one person
+        // this matches the original model, which conditions on survival.
+        const w = this.n === 1 ? 1 : (this.pAlive(i, t) / Math.max(this.pHousehold(t), 1e-12));
+        const gInc = this.grossIncome(i, t);
+        incGross[t] += (gInc.salary + gInc.statePension + gInc.employerPension) * Math.min(w, 1);
+        incVec[t]   += this.netIncome(i, t) * Math.min(w, 1);
+      }
+      essVec[t] = this.p.cbar * this.equivScale(t);
+      // mortgagePayment() is the level payment of an ORDINARY annuity, so the
+      // stream must run t = 1..N. Booking it from t = 0 would over-repay the
+      // loan by one year's interest.
+      if (H.own && t >= 1 && t <= (H.mortgageYearsLeft || 0)) mortVec[t] = mPay;
+    }
+
+    // Downsizing releases equity in a single year.
+    if (H.own && H.downsizeAge && H.downsizeRelease > 0) {
+      const dt = Math.round(H.downsizeAge - this.baseAge);
+      if (dt >= 0 && dt <= T) {
+        /* Net off the balance still outstanding when the house is sold, not
+           today's. The repayments between now and then are already on the
+           balance sheet as L0Mort; deducting the opening balance again would
+           charge the same debt twice. */
+        let bal = H.mortgageBalance || 0;
+        const r = H.mortgageRate || 0;
+        for (let k = 0; k < Math.min(dt, H.mortgageYearsLeft || 0); k++) {
+          bal = bal * (1 + r) - mPay;
+        }
+        const equity = Math.max(0, (H.value || 0) - Math.max(0, bal));
+        windfall[dt] += equity * H.downsizeRelease;
+      }
+    }
+
+    // --- balance sheet ----------------------------------------------------
+    const H0r = this.pdv(incVec, 0, kY);          // human capital, after tax
+    const H0w = this.pdv(windfall, 0, rf);        // downsizing proceeds
+    const H0 = H0r + H0w;
+    const L0Ess = this.pdv(essVec, 0, kC);
+    const L0Mort = this.pdv(mortVec, 0, rf);      // a contractual, riskless stream
+    const L0Risky = L0Ess + L0Mort;
+
+    const sav = this.p.savings;
+    const F0 = sav.shares + sav.bonds + sav.cash
+             + (sav.pension || 0) * (1 - (this.p.pensionTaxHaircut || 0));
+    const w0SansLI = F0 + H0 - L0Risky;
+
+    const D0 = this.consumpDiv(0, h), liPerm0 = this.liPerm(0);
+
+    const W = [], IV = []; let wSum = 0;
+    for (let t = 0; t <= T; t++) {
+      const w = this.survHH(0, t) / Math.pow(1 + this.p.rho, t);
+      W.push(w); wSum += w; IV.push(this.ivaFn(0, t, g));
+    }
+    const cx = { D0, W, wSum, IV, liPerm0 }, beqDiv = wSum;
+    // Negative when essentials already exceed lifetime resources; a bequest is
+    // never negative, so clamp before either branch uses it.
+    const maxBeq = Math.max(0, liPerm0 > 0 ? w0SansLI / liPerm0 : 0);
+
+    let beq = 0;
+    if (this.p.beqMode === 'opt' && maxBeq > 0) {
+      const obj = B => this.intergenUtil(B, this.consumpConstEquiv(B, w0SansLI, cx), beqDiv);
+      beq = goldenMax(obj, 1e-9 * maxBeq, 0.999999 * maxBeq);
+    } else if (this.p.beqMode === 'fixed') {
+      const want = Number.isFinite(this.p.beqFixed) ? Math.max(0, this.p.beqFixed) : 0;
+      beq = Math.min(want, 0.999 * maxBeq);
+    }
+
+    const L0Cash = beq * liPerm0;
+    const L0 = L0Risky + L0Cash;
+    const W0 = F0 + H0 - L0;
+    const CD0 = W0 / D0;
+
+    // --- projection -------------------------------------------------------
+    const th = this.p.theta, sSDF = this.cma.sigmaSDF;
+    const muIVA = 0.5*(1-th)*th*sSDF*sSDF, sigmaIVA = th*sSDF;
+    const muC = -0.5*sigmaC*sigmaC, muY = -0.5*sigmaY*sigmaY;
+    const globFrac = globalStockFraction();
+
+    const years = [];
+    for (let t = 0; t <= T; t++) {
+      const HR = this.pdv(incVec, t, kY) + this.pdv(windfall, t, rf);
+      const LR = this.pdv(essVec, t, kC) + this.pdv(mortVec, t, rf);
+      const LC = beq * this.liPerm(t);
+      const Dt = this.consumpDiv(t, h);
+      const numIVA = this.ivaFn(0, t, g) * CD0;
+      const Wt = Dt * numIVA;
+      const Ft = Wt - HR + LR + LC;
+
+      const nwEq = th*Wt, nwGl = globFrac*nwEq, nwDom = nwEq-nwGl, nwCash = Wt-nwEq;
+      const hcEq = HR*this.p.eqHC, hcGl = hcEq*this.globHC, hcDom = hcEq-hcGl, hcB = HR-hcEq;
+      const lEq = LR*this.p.eqLiab, lGl = lEq*this.globLiab, lDom = lEq-lGl, lB = LR-lEq;
+      const unc = [nwDom-hcDom+lDom, nwGl-hcGl+lGl, 0, 0-hcB+lB, nwCash+LC];
+      unc[2] = unc[0] + unc[1];
+      const con = reallocNeg(unc);
+      const st = Math.sqrt(t);
+
+      years.push({
+        t, age: this.baseAge + t, year: this.p.curYear + t,
+        ages: this.people.map((_, i) => this.ageAt(i, t)),
+        incomeNet: incVec[t], incomeGross: incGross[t],
+        essentials: essVec[t], mortgage: mortVec[t], windfall: windfall[t],
+        humanCapital: HR, liabilities: LR + LC, liabEssentials: LR, liabBequest: LC,
+        netWorth: Wt, finWealth: Ft, delta: Dt,
+        discConsump: numIVA, totalConsump: numIVA + essVec[t] + mortVec[t],
+        survHousehold: this.pHousehold(t), survBoth: this.pBoth(t),
+        survEach: this.people.map((_, i) => this.pAlive(i, t)),
+        /* With no financial wealth there is no share to report. Returning 0
+           would be indistinguishable from a genuine "hold all cash" answer,
+           and would stop the leverage warning firing for exactly the
+           young-with-no-savings households it exists for. */
+        equityShareUncon: Ft > 1e-6 ? unc[2]/Ft : null,
+        equityShareCon:   Ft > 1e-6 ? con[2]/Ft : null,
+        equityAmountUncon: unc[2], equityAmountCon: con[2],
+        allocUncon: unc, allocCon: con,
+        bandsConsump: PCTL.map(q => numIVA*Math.exp(t*muIVA + q.z*st*sigmaIVA)),
+        bandsIncome:  PCTL.map(q => incVec[t]*Math.exp(t*muY + q.z*st*sigmaY)),
+      });
+    }
+
+    return {
+      h, g, H0, H0r, H0w, L0, L0Risky, L0Ess, L0Mort, L0Cash, F0, W0, w0SansLI,
+      D0, CD0, beq, maxBeq, beqDiv, liPerm0, mortgagePayment: mPay,
+      retYear: this.retYear, maxYear: T, baseAge: this.baseAge,
+      years, cma: this.cma, muIVA, sigmaIVA,
+      cHat: this.consumpConstEquiv(beq, w0SansLI, cx),
+    };
+  }
+}
+
+/** Lifetime cost of fees: what spending would be at zero cost, minus actual. */
+function feeImpact(p, ctx) {
+  const withFee = new Household(p, ctx).solve();
+  const noFee = new Household({ ...p, fee: 0 }, ctx).solve();
+  return {
+    withFee: withFee.CD0, noFee: noFee.CD0,
+    annualLoss: noFee.CD0 - withFee.CD0,
+    pctLoss: noFee.CD0 > 0 ? (noFee.CD0 - withFee.CD0) / noFee.CD0 : 0,
+  };
+}
+
+/* ===========================================================================
+   Country modules: mortality, earnings curves, tax, state pension.
+
+   Every figure carries its source and the year it applies to. Where a rule is
+   simplified for a planning model rather than a tax return, the simplification
+   is stated in a comment.
+   =========================================================================== */
+
+
+/* --------------------------------------------------------------- earnings */
+/* Cubic fits in log-earnings to published median earnings by age band.
+   UK: ONS ASHE 2025, full-time median gross annual pay, Table 6.7a.
+   CZ: ISPV 2025 mzdová sféra, median gross monthly, by věková kategorie.
+   Fit error is within +/-1.5% across ages 22-60; the fitted peak reproduces
+   the published peak band (UK 40-49, CZ 30-39). */
+const SALARY_FIT = {
+  UK: {
+    male:   [7.7219e-6, -0.0017056089, 0.1074803031, 8.644344551],
+    female: [1.05454e-5, -0.0020429234, 0.1184344259, 8.5115511536],
+  },
+  CZ: {
+    male:   [2.04079e-5, -0.0030720662, 0.1460352896, 8.6021359557],
+    female: [1.71643e-5, -0.0024625362, 0.1104143801, 9.0459045667],
+  },
+};
+
+/** Career trajectory tilt: how steeply pay rises relative to the population. */
+const TRAJECTORY = { flat: 0, typical: 1, steep: 1.6 };
+
+function makeSalaryCurve(cc) {
+  return (age, person) => {
+    const c = SALARY_FIT[cc][person.sex === 2 ? 'female' : 'male'];
+    const a = Math.max(18, Math.min(75, age));
+    const base = c[0]*a*a*a + c[1]*a*a + c[2]*a + c[3];
+    // A trajectory multiplier stretches or flattens the profile around age 40
+    // without changing its level at the person's current age (the engine
+    // normalises by the curve's value at that age anyway).
+    const tilt = person.trajectory == null ? 1 : person.trajectory;
+    const c0 = SALARY_FIT[cc][person.sex === 2 ? 'female' : 'male'];
+    const at40 = c0[0]*64000 + c0[1]*1600 + c0[2]*40 + c0[3];
+    return Math.exp(at40 + (base - at40) * tilt);
+  };
+}
+
+/* ============================== UNITED KINGDOM ============================ */
+/* Tax year 2025/26 (England, Wales & Northern Ireland). Scotland sets its own
+   income tax bands; a Scottish user should treat the tax figures as indicative.
+   Sources: gov.uk income tax rates, National Insurance rates, new State Pension. */
+
+const UK_PA = 12570;              // personal allowance
+const UK_PA_TAPER_START = 100000; // PA reduced by 1 for every 2 above this
+const UK_BASIC_LIMIT = 37700;     // taxable income taxed at 20%
+const UK_ADDL_THRESHOLD = 125140;
+const UK_NI_PT = 12570, UK_NI_UEL = 50270;
+const UK_STATE_PENSION_FULL = 11973;   // 2025/26, GBP/yr, 35 qualifying years
+const UK_AE_LOWER = 6240, UK_AE_UPPER = 50270;  // auto-enrolment band
+
+/** UK income tax on non-savings income. */
+function ukIncomeTax(gross) {
+  const pa = Math.max(0, UK_PA - Math.max(0, gross - UK_PA_TAPER_START) / 2);
+  const taxable = Math.max(0, gross - pa);
+  let tax = 0;
+  tax += Math.min(taxable, UK_BASIC_LIMIT) * 0.20;
+  if (taxable > UK_BASIC_LIMIT) {
+    const higher = Math.min(taxable, UK_ADDL_THRESHOLD - pa) - UK_BASIC_LIMIT;
+    if (higher > 0) tax += higher * 0.40;
+  }
+  const addl = taxable - (UK_ADDL_THRESHOLD - pa);
+  if (addl > 0) tax += addl * 0.45;
+  return tax;
+}
+
+/** Employee Class 1 National Insurance. Not charged on pension income, and
+    not charged at all once the employee is over State Pension age. */
+function ukNI(salary, overSPA) {
+  if (overSPA || salary <= UK_NI_PT) return 0;
+  const main = Math.min(salary, UK_NI_UEL) - UK_NI_PT;
+  const upper = Math.max(0, salary - UK_NI_UEL);
+  return main * 0.08 + upper * 0.02;
+}
+
+/** State Pension age by birth year, per the legislated timetable. */
+function ukStatePensionAge(birthYear) {
+  if (birthYear < 1961) return 66;
+  if (birthYear < 1978) return 67;
+  return 68;
+}
+
+/**
+ * The new State Pension is FLAT-RATE — it does not depend on earnings at all.
+ * 35 qualifying years gives the full amount, 10 is the cliff below which
+ * nothing is paid, and in between it is strictly pro rata.
+ */
+function ukStatePension(person) {
+  const years = person.niYears != null
+    ? person.niYears
+    : Math.max(0, Math.min(35, person.workUntilAge - 21));
+  if (years < 10) return 0;
+  return UK_STATE_PENSION_FULL * Math.min(1, years / 35);
+}
+
+/** Statutory auto-enrolment employer contribution, on the qualifying band. */
+function ukEmployerPension(salary, rate) {
+  const band = Math.max(0, Math.min(salary, UK_AE_UPPER) - UK_AE_LOWER);
+  return band * (rate != null ? rate : 0.03);
+}
+
+const UK = {
+  code: 'UK', lang: 'en', currency: 'GBP', locale: 'en-GB',
+  taxYear: '2025/26',
+  lifeTable: UK_LIFE_TABLE,
+  salaryCurve: makeSalaryCurve('UK'),
+  medianSalary: 39039,
+  avgWage: 39039,
+  rf: 0.015,                 // real risk-free rate, index-linked gilts ~1.5%
+  defaultFee: 0.005,         // workplace default fund; DIY passive is nearer 0.30%
+  pensionAgeFor: ukStatePensionAge,
+  minPrivatePensionAge: 57,  // rises from 55 to 57 in April 2028
+  statePensionCanBeTakenEarly: false,
+  /* Drawing a pension pot: 25% is tax-free and the rest is taxed as income.
+     A retiree whose other income keeps them in the basic-rate band therefore
+     loses about 0.75 x 20% = 15% of the pot to tax. */
+  pensionTaxHaircut: 0.15,
+  statePension: (person) => ukStatePension(person),
+  employerPension: ukEmployerPension,
+  /** Tax on directly-received income for one person in one year. */
+  tax(g, person, t, hh) {
+    const age = person.age + t;
+    const overSPA = age >= person.pensionAge;
+    // The State Pension is taxable, but bears no National Insurance.
+    const taxable = g.salary + g.statePension;
+    const tax = ukIncomeTax(taxable);
+    const ni = ukNI(g.salary, overSPA);
+    return taxable - tax - ni;
+  },
+  /* Defaults describe a plausible median UK household: ASHE median full-time
+     pay, essentials at roughly half of net pay, and a mortgage costing about a
+     fifth of it. Rates are REAL, so 1.5% is a ~4.5% nominal mortgage. */
+  defaults: {
+    salary: 39000, cbar: 16000,
+    savings: { shares: 12000, bonds: 0, cash: 6000, pension: 25000 },
+    homeValue: 290000, mortgageBalance: 120000, mortgageRate: 0.015, mortgageYears: 22,
+    employerPensionRate: 0.03,
+  },
+};
+
+/* ================================= CZECHIA ================================ */
+/* 2026 parameters. Sources: zákon o daních z příjmů, ČSSZ, MPSV.
+   průměrná mzda 2026 = 48,967 CZK/month. */
+
+const CZ_AVG_WAGE_M = 48967;
+const CZ_TAX_23_THRESHOLD = 36 * CZ_AVG_WAGE_M;      // 1,762,812 CZK/yr
+const CZ_CREDIT = 30840;                              // sleva na poplatníka
+const CZ_SOCIAL_CAP = 48 * CZ_AVG_WAGE_M;            // 2,350,416 CZK/yr
+const CZ_RED1 = Math.ceil(0.44 * CZ_AVG_WAGE_M);      // 21,546 CZK/month (published)
+const CZ_RED2 = Math.ceil(4.00 * CZ_AVG_WAGE_M);      // 195,868 CZK/month (published)
+const CZ_BASE_PENSION_M = 4900;                      // základní výměra, CZK/month
+const CZ_PENSION_TAX_EXEMPT = 806400;                // 36x minimum wage, CZK/yr
+
+/** Czech income tax: 15% then 23%, less the basic taxpayer credit. */
+function czIncomeTax(gross) {
+  const lower = Math.min(gross, CZ_TAX_23_THRESHOLD);
+  const upper = Math.max(0, gross - CZ_TAX_23_THRESHOLD);
+  return Math.max(0, lower * 0.15 + upper * 0.23 - CZ_CREDIT);
+}
+
+/** Employee social (7.1%, capped) and health (4.5%, uncapped) insurance. */
+function czSocialHealth(salary) {
+  const social = Math.min(salary, CZ_SOCIAL_CAP) * 0.071;
+  const health = salary * 0.045;
+  return social + health;
+}
+
+/** Retirement age: 65 up to the 1965 cohort, +1 month per year, capped at 67. */
+function czRetirementAge(birthYear) {
+  if (birthYear <= 1965) return 65;
+  if (birthYear >= 1989) return 67;
+  return 65 + (birthYear - 1965) / 12;
+}
+
+/* Zákon č. 286/2024 Sb. puts both the accrual rate and the zápočet below the
+   first redukční hranice on a ten-year glide path, keyed to the year the
+   pension is AWARDED, not the current year:
+     accrual  1.500% -> 1.450% by 2035, falling 0.005 pp per award year
+     zápočet    100% ->    90% by 2035, falling 1 pp per award year
+   A life-cycle model projects people retiring in the 2040s and 2050s, so using
+   the 2026 values for everyone overstates the state pension by ~7.6%.
+   Source: ČSSZ, "Přehled nejdůležitějších údajů pro sociální zabezpečení
+   v roce 2026" (10 Dec 2025). */
+const czGlideStep = (awardYear) => Math.max(0, Math.min(10, (awardYear || 2026) - 2025));
+const czAccrualRate = (awardYear) => 0.015 - 0.00005 * czGlideStep(awardYear);
+const czZapocet = (awardYear) => 1.00 - 0.01 * czGlideStep(awardYear);
+
+/**
+ * Starobní důchod = základní výměra + procentní výměra.
+ *
+ * The percentage component is the accrual rate per insured year applied to the
+ * výpočtový základ — the personal assessment base after the redukční hranice.
+ * Those thresholds are what make the Czech system strongly redistributive:
+ * earnings above 4x the average wage add nothing at all.
+ *
+ * Early claiming reduces the RATE by 1.5 percentage points of the výpočtový
+ * základ per commenced 90-day block (0.75 pp from 2026 for 45+ years of
+ * qualifying service). It does NOT scale the whole pension, and it never
+ * touches the základní výměra.
+ *
+ * Statutory rounding: the výpočtový základ and the procentní výměra are each
+ * rounded up to whole crowns. With those in place this reproduces ČSSZ's
+ * published 2026 table exactly.
+ */
+function czStatePension(person, avgMonthlyEarnings, opts = {}) {
+  const awardYear = opts.awardYear || 2026;
+  const ovz = avgMonthlyEarnings;
+  const vz = Math.ceil(
+    czZapocet(awardYear) * Math.min(ovz, CZ_RED1)
+    + 0.26 * Math.max(0, Math.min(ovz, CZ_RED2) - CZ_RED1));
+  const years = person.insuredYears != null
+    ? person.insuredYears
+    : Math.max(0, Math.min(50, person.workUntilAge - 20));
+
+  let rate = czAccrualRate(awardYear) * years;
+
+  // Early claiming: a permanent cut to the rate, in points of the VZ.
+  const blocks = opts.earlyBlocks || 0;
+  if (blocks > 0) {
+    // From 1.1.2026 the cut halves for 45+ years of "hard" service. Study and
+    // unemployment do not count toward that test, so it is passed in
+    // explicitly rather than inferred from the general insured-years figure.
+    const perBlock = (opts.longServiceYears || 0) >= 45 ? 0.0075 : 0.015;
+    rate -= blocks * perBlock;
+  }
+  rate = Math.max(0, rate);
+
+  const procentni = Math.ceil(rate * vz);
+  return (CZ_BASE_PENSION_M + procentni) * 12;
+}
+
+const CZ = {
+  code: 'CZ', lang: 'cs', currency: 'CZK', locale: 'cs-CZ',
+  taxYear: '2026',
+  lifeTable: CZ_LIFE_TABLE,
+  salaryCurve: makeSalaryCurve('CZ'),
+  medianSalary: 43241 * 12,
+  avgWage: CZ_AVG_WAGE_M * 12,
+  rf: 0.015,
+  defaultFee: 0.015,          // bank-distributed podílové fondy run ~2% TER; ETFs far less
+  pensionAgeFor: czRetirementAge,
+  minPrivatePensionAge: 60,   // DPS payout normally from 60
+  statePensionCanBeTakenEarly: true,
+  earlyRetirementMaxYears: 3,
+  earlyRetirementPenaltyPer90Days: 0.015,
+  /* DPS: a lump sum is taxed on the gains only, an annuity is exempt. The
+     effective drag on the pot is small compared with the UK. */
+  pensionTaxHaircut: 0.05,
+  statePension(person, hh) {
+    // Personal assessment base = average indexed monthly earnings over the
+    // working life, which in a real-terms model is the average of the salary
+    // curve across the working years.
+    const curve = this.salaryCurve;
+    const startAge = 22, endAge = person.workUntilAge;
+    if (endAge <= startAge) return CZ_BASE_PENSION_M * 12;
+    let sum = 0, n = 0;
+    for (let a = startAge; a < endAge; a++) {
+      sum += person.salary * curve(a, person) / curve(person.age, person);
+      n++;
+    }
+    const avgMonthly = (sum / n) / 12;
+
+    /* Compare the claim age with the statutory age on the SAME basis. The
+       interface shows whole years, so the statutory age is rounded the same
+       way; comparing a rounded claim age against a fractional statutory age
+       would hand a spurious early-retirement cut to every cohort whose
+       statutory age happens to round down. */
+    const statutory = person.statutoryPensionAge != null
+      ? person.statutoryPensionAge
+      : Math.round(this.pensionAgeFor(person.birthYear || 1990));
+    const yearsEarly = statutory - person.pensionAge;
+
+    // Předčasný důchod is payable at most 3 years early. Earlier than that,
+    // there is no entitlement at all — not a reduced one.
+    if (yearsEarly > this.earlyRetirementMaxYears + 1e-9) return 0;
+
+    const blocks = yearsEarly > 0 ? Math.ceil(yearsEarly * 365 / 90) : 0;
+    const longService = person.longServiceYears != null
+      ? person.longServiceYears
+      : Math.max(0, Math.min(50, person.workUntilAge - 22));   // excludes study
+
+    return czStatePension(person, avgMonthly, {
+      awardYear: (person.birthYear || 1990) + person.pensionAge,
+      earlyBlocks: blocks,
+      longServiceYears: longService,
+    });
+  },
+  employerPension: (salary, rate) => salary * (rate != null ? rate : 0.03),
+  tax(g, person, t, hh) {
+    const salary = g.salary;
+    const pension = g.statePension;
+    const salaryTax = czIncomeTax(salary) + czSocialHealth(salary);
+    // The state pension is exempt below 36x the minimum wage; almost nobody
+    // exceeds that, but the rule is applied rather than assumed away.
+    const pensionTax = pension > CZ_PENSION_TAX_EXEMPT
+      ? czIncomeTax(pension - CZ_PENSION_TAX_EXEMPT) : 0;
+    return salary - salaryTax + pension - pensionTax;
+  },
+  /* Median Czech household: ISPV median pay, essentials ~20k CZK/month, and a
+     hypotéka of 2m CZK. Rates are REAL, so 2% is a ~5% nominal mortgage. */
+  defaults: {
+    salary: 43241 * 12, cbar: 240000,
+    savings: { shares: 150000, bonds: 0, cash: 120000, pension: 120000 },
+    homeValue: 5500000, mortgageBalance: 2000000, mortgageRate: 0.02, mortgageYears: 22,
+    employerPensionRate: 0.03,
+  },
+};
+
+const COUNTRIES = { UK, CZ };
+
+/* ------------------------------------------------------- risk elicitation */
+/**
+ * Convert a stated willingness to pay to avoid a 50/50 gamble into a CRRA
+ * coefficient of relative risk aversion.
+ *
+ * For a gamble that multiplies wealth by (1+up) or (1-down) with equal
+ * probability, and a certainty equivalent of (1-pi) times wealth:
+ *     0.5[(1+up)^(1-g) + (1-down)^(1-g)] = (1-pi)^(1-g)
+ * Solved for g by bisection. This is the Barsky-Juster-Kimball-Shapiro
+ * income-gamble question in its willingness-to-pay form.
+ */
+function riskAversionFromGamble(pi, up = 0.20, down = 0.20) {
+  /* Campbell's "demon gamble": a symmetric 50/50 coin toss on LIFETIME wealth.
+     Symmetry makes the Arrow-Pratt approximation gamma ~= 2*pi/x^2 exact to
+     first order, and staking lifetime wealth rather than pocket money is what
+     defuses the Rabin critique. We solve the exact CRRA equation rather than
+     the approximation, which understates gamma badly above pi ~ 5%.
+     Validated against Kimball-Sahm-Shapiro (2008) Table 1. */
+  const certEquiv = (gm) => {
+    if (Math.abs(gm - 1) < 1e-9) {
+      return Math.exp(0.5 * (Math.log(1 + up) + Math.log(1 - down)));
+    }
+    const e = 1 - gm;
+    return Math.pow(0.5 * (Math.pow(1 + up, e) + Math.pow(1 - down, e)), 1 / e);
+  };
+  // f is decreasing in gamma over the economically meaningful range, but the
+  // raw expected-utility equation has a second, spurious root at very high
+  // gamma. Scan upward and bisect on the FIRST sign change.
+  const f = (gm) => certEquiv(gm) - (1 - pi);
+  let lo = 0.05, flo = f(lo);
+  if (flo <= 0) return lo;
+  let hi = null;
+  for (let g = 0.1; g <= 30; g += 0.1) {
+    if (f(g) <= 0) { hi = g; break; }
+  }
+  if (hi === null) return 30;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) > 0) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Willingness to pay implied by a given risk aversion — the inverse mapping. */
+function gambleFromRiskAversion(gamma, up = 0.20, down = 0.20) {
+  const e = 1 - gamma;
+  const ce = Math.abs(gamma - 1) < 1e-9
+    ? Math.exp(0.5 * (Math.log(1 + up) + Math.log(1 - down)))
+    : Math.pow(0.5 * (Math.pow(1 + up, e) + Math.pow(1 - down, e)), 1 / e);
+  return 1 - ce;
+}
+
+/** The model's risk tolerance theta is the reciprocal of relative risk aversion. */
+const thetaFromRiskAversion = (gamma) => 1 / gamma;
+const riskAversionFromTheta = (theta) => 1 / theta;
+</script>
+<script>/* User-facing copy for both builds. Czech is idiomatic, not transliterated. */
+const I18N = {
+en: {
+  title: 'Lifetime Financial Planner',
+  sub: 'How much you can afford to spend, and how to invest it',
+  disclaimerBold: 'Educational tool, not financial advice.',
+  disclaimer: 'It shows what one economic model implies from the numbers you type. Figures are in today’s money, before any change in the law.',
+  copyLink: 'Copy link', copied: 'Copied', reset: 'Reset', theme: 'Theme', print: 'Print / PDF',
+
+  s1: 'Who is this for', s2: 'You', s2b: 'Your partner', s3: 'Work and money',
+  s4: 'Your home', s5: 'What you want', s6: 'Costs and assumptions',
+
+  justMe: 'Just me', couple: 'Me and my partner', no: 'No', yes: 'Yes',
+  age: 'Age', sex: 'Sex', male: 'Male', female: 'Female',
+  sexHelp: 'Used only to choose a life-expectancy table. Women live longer on average, so the same money must stretch further.',
+  health: 'Health and family history',
+  healthOpts: ['Worse than most', 'About average', 'Better than most', 'Much better'],
+  healthHelp: 'Moves the age you are most likely to reach by up to seven years. Living longer is wonderful and expensive: the same savings must cover more years.',
+  trajectory: 'Where your career is heading',
+  trajOpts: ['Pay has levelled off', 'Following the normal path', 'Rising faster than most'],
+  trajHelp: 'The model already knows the typical pay curve for your country and sex. This tilts it if your own path is flatter or steeper.',
+
+  salary: 'Gross salary, per year',
+  stopWork: 'Stop working at',
+  pensionStarts: 'State pension starts at',
+  pensionAuto: 'set by law for your birth year',
+  earlyGapWarn: 'You plan to stop working {y} years before your state pension starts. Those years have to be paid for out of savings.',
+  savings: 'What you have saved',
+  savShares: 'Shares / funds', savBonds: 'Bonds', savCash: 'Cash', savPension: 'Pension pot',
+  savHelp: 'Include workplace and personal pensions. Leave out your home — it is handled below.',
+  pensionPotNote: 'Pension money is counted after the tax you will pay when you draw it.',
+  employerPension: 'Employer pension contribution',
+  essentials: 'Essential spending, per year',
+  essentialsHelp: 'Food, utilities, insurance, transport, minimum debt payments — what you could not cut in a bad year. Do not include your mortgage; that goes below.',
+
+  ownHome: 'Do you own your home?', rent: 'I rent', own: 'I own it',
+  homeValue: 'What it is worth', mortgageBalance: 'Mortgage still owed',
+  mortgageRate: 'Mortgage rate, real', mortgageYears: 'Years left to pay',
+  rateHelp: 'Real means after inflation. A 4.5% mortgage with 3% inflation is about 1.5% real.',
+  homeHelp: 'Your home is not counted as money you can spend — you have to live somewhere. The mortgage is counted, and your spending rises once it is paid off.',
+  downsize: 'Plan to downsize later?',
+  downsizeAge: 'At age', downsizeRelease: 'Releasing',
+  downsizeHelp: 'Selling and moving somewhere cheaper turns part of your home into money you can spend.',
+
+  qRisk: 'A coin is about to be tossed on your lifetime wealth.',
+  qRiskBody: 'Heads, everything you will ever have goes up by a fifth. Tails, it goes down by a fifth. Someone offers to call the whole thing off. <b>What is the most of your wealth you would hand over to walk away?</b>',
+  qRiskNothing: 'Nothing — I’d flip',
+  qRiskLots: 'A lot — make it stop',
+  riskReadout: 'That puts <b>{eq}</b> of everything you own and will earn into shares, which today means <b>{fw}</b> of your savings.',
+  riskFootnote: 'This is the standard way economists measure appetite for risk. Your answer implies a risk aversion of about {g}, where 1 is adventurous and 10 is very cautious.',
+
+  qShape: 'Which spending pattern would you rather have?',
+  qShapeOpts: ['More now, less later', 'About the same throughout', 'Less now, more later'],
+  qShapeHelp: 'There is no right answer. Some people want their money while they are young enough to enjoy it; others want to be sure of comfort at the end.',
+  shapeReadout: 'Your spending changes by about <b>{g}</b> a year in real terms.',
+
+  qSmooth: 'Markets fall hard the year after you retire. What do you do?',
+  qSmoothOpts: ['Keep spending exactly as planned', 'Trim a little and carry on', 'Cut back properly, rebuild later'],
+  qSmoothHelp: 'Holding spending steady in bad years is a kind of insurance, and like all insurance it costs something on average.',
+
+  qAnnuity: 'How much of your pension pot would you turn into a guaranteed income for life?',
+  annNone: 'None', annAll: 'All of it',
+  annReadout: 'Because money from those who die early funds those who live long, this lets you spend more — but the capital stops being yours.',
+
+  qBequest: 'Do you want to leave money behind?',
+  beqOpts: ['Not a priority', 'A specific amount', 'Let the model decide'],
+  beqAmount: 'Amount to leave',
+  beqHelp: 'Everything you leave is something you did not spend. The model shows the cost either way.',
+
+  fee: 'What you pay in investment charges, per year',
+  feeHelp: 'Platform fees plus fund charges. Expected returns are quoted before costs, so this comes straight off them.',
+  feeReadout: 'Over your lifetime this fee costs about <b>{loss}</b> a year of spending — <b>{pct}</b> of what you could otherwise have.',
+  rf: 'Real risk-free rate', horizon: 'Plan to age',
+
+  heroLabel: 'You can afford to spend, on top of essentials',
+  perYear: 'a year', perMonth: 'a month',
+  heroNote: 'That is {m} a month, or {t} a year including essentials{mort}. In today’s money, for life.',
+  andMortgage: ' and the mortgage',
+  cardNetWorth: 'Economic net worth', cardEquity: 'Shares, as a share of savings',
+  cardPension: 'State pension', cardBequest: 'Left behind', cardFees: 'Lifetime cost of charges',
+  explain: 'Where does this number come from?',
+  divisorRow: 'spread over, in survival-weighted years',
+  noSavingsShort: 'nothing to allocate yet',
+  noSavingsNote: 'You have no savings to invest. The question of how to split them starts once you do.',
+  noSavingsAlert: 'With no savings there is no allocation to make. The model still says your future earnings are bond-like, so the moment you do start saving, shares are where the balance belongs.',
+
+  chSpend: 'What you can spend, year by year',
+  chSpendDesc: 'Essentials and the mortgage are the floor. The band shows how the rest could turn out.',
+  chWealth: 'Your balance sheet over time',
+  chWealthDesc: 'Future earnings are an asset; future essentials are a debt. Watch them trade places.',
+  chGlide: 'How much of your savings should be in shares',
+  chGlideDesc: 'Your future salary already acts like a large bond, so the model wants your savings tilted the other way. The solid line is what you can actually hold.',
+  glideFalls: 'The share falls steadily as your future salary — and the bond-like security it provides — runs out.',
+  glideHump: 'It rises until about {a} and then falls. The climb is your mortgage being repaid: while you owe it, you are already short a bond, so shares are held back.',
+  chSurv: 'How long the plan has to last',
+  chSurvDesc: 'The chance of at least one of you still being here.',
+  chSurvSingle: 'Your chance of still being here at each age.',
+  bsTitle: 'Today’s balance sheet', bsDesc: 'Everything you own and owe, in economic terms.',
+
+  legTotal: 'Total spending, expected', legRange: 'Range of outcomes',
+  legFloor: 'Essentials and mortgage', legHC: 'Future earnings',
+  legSav: 'Savings and investments', legLiab: 'Future commitments owed',
+  legNW: 'Net worth', legCan: 'What you can actually do',
+  legIdeal: 'Theoretical ideal (needs borrowing)', legHH: 'At least one of you alive',
+  legBoth: 'Both of you alive', legYou: 'You', legPartner: 'Your partner',
+  retire: 'stop work', pension: 'pension',
+  assets: 'Assets', liabsNW: 'Liabilities and net worth',
+  rowSavings: 'Savings and investments', rowHC: 'Future earnings after tax',
+  rowTotal: 'Total', rowEss: 'Future essential spending', rowMort: 'Mortgage still to pay',
+  rowBeq: 'Inheritance set aside', rowNW: 'Net worth — yours to spend',
+  value: 'Value', share: 'Share',
+
+  alertNoSolution: 'This plan does not add up.',
+  alertNoSolutionBody: 'Essential spending and any inheritance use up more than everything you own and will earn. Spend less on essentials, work longer, or leave less behind.',
+  alertThin: 'Very little left over.',
+  alertThinBody: 'Essentials absorb nearly all your lifetime resources.',
+  alertGap: 'You have an income gap.',
+  alertGapBody: 'Between stopping work at {a} and your pension starting at {b} there is no income at all. Those {y} years come entirely out of savings.',
+  alertEquity: 'Read the share allocation as a direction, not an instruction.',
+  alertEquityBody: 'Because future earnings dominate your balance sheet, the unconstrained answer is {p}. The honest reading is “hold as much in shares as you can stomach”.',
+  alertLowEq: 'Your mortgage is doing the job of a bond.',
+  alertLowEqBody: 'You owe {m} against {f} of savings. In economic terms you are already heavily short a fixed-income asset, so the model keeps your savings out of shares until the balance comes down. Overpaying the mortgage and investing are close substitutes here.',
+  alertScotland: 'Scottish income tax differs.',
+  alertScotlandBody: 'These figures use the rates for England, Wales and Northern Ireland.',
+
+  footHow: 'Where this comes from.',
+  footNotAdvice: 'Not advice.',
+  footNotAdviceBody: 'No allowance for children, divorce, redundancy, long-term care, or a change in the law. Returns are assumptions, not forecasts. Speak to a qualified adviser before acting.',
+  printedOn: 'Printed', summaryFor: 'Plan summary',
+},
+cs: {
+  title: 'Finanční plán na celý život',
+  sub: 'Kolik si můžete dovolit utrácet a jak peníze investovat',
+  disclaimerBold: 'Vzdělávací nástroj, nikoli finanční poradenství.',
+  disclaimer: 'Ukazuje, co z vašich čísel plyne podle jednoho ekonomického modelu. Všechny částky jsou v dnešních cenách.',
+  copyLink: 'Kopírovat odkaz', copied: 'Zkopírováno', reset: 'Zpět na začátek', theme: 'Vzhled', print: 'Tisk / PDF',
+
+  s1: 'Pro koho plán je', s2: 'O vás', s2b: 'O partnerovi', s3: 'Práce a peníze',
+  s4: 'Bydlení', s5: 'Co si přejete', s6: 'Náklady a předpoklady',
+
+  justMe: 'Jen já', couple: 'Já a partner', no: 'Ne', yes: 'Ano',
+  age: 'Věk', sex: 'Pohlaví', male: 'Muž', female: 'Žena',
+  sexHelp: 'Slouží jen k výběru úmrtnostní tabulky. Ženy se v průměru dožívají vyššího věku, takže stejné úspory musí vystačit na delší dobu.',
+  health: 'Zdraví a rodinná anamnéza',
+  healthOpts: ['Horší než u většiny', 'Zhruba průměr', 'Lepší než u většiny', 'Výrazně lepší'],
+  healthHelp: 'Posune nejpravděpodobnější věk dožití až o sedm let. Dlouhý život je skvělá zpráva a zároveň drahá: stejné úspory musí pokrýt více let.',
+  trajectory: 'Kam směřuje vaše kariéra',
+  trajOpts: ['Plat už se ustálil', 'Běžný vývoj', 'Roste rychleji než u většiny'],
+  trajHelp: 'Model už zná typickou mzdovou křivku pro Česko podle pohlaví. Tímto ji nakloníte, pokud je vaše dráha plošší nebo strmější.',
+
+  salary: 'Hrubá mzda ročně',
+  stopWork: 'Přestanu pracovat v',
+  pensionStarts: 'Starobní důchod začne v',
+  pensionAuto: 'dané zákonem podle roku narození',
+  earlyGapWarn: 'Chcete přestat pracovat {y} let před začátkem důchodu. Tyto roky musí pokrýt úspory.',
+  savings: 'Co máte naspořeno',
+  savShares: 'Akcie a fondy', savBonds: 'Dluhopisy', savCash: 'Hotovost a spořicí účet',
+  savPension: 'Penzijní spoření (DPS / DIP)',
+  savHelp: 'Zahrňte penzijní spoření i investice. Nemovitost sem nepatří — té se věnuje další část.',
+  pensionPotNote: 'Penzijní spoření se počítá po dani, kterou zaplatíte při výběru.',
+  employerPension: 'Příspěvek zaměstnavatele',
+  essentials: 'Nezbytné výdaje ročně',
+  essentialsHelp: 'Jídlo, energie, pojištění, doprava, splátky — to, co byste ve zlém roce neškrtli. Hypotéku sem nezahrnujte, ta je níže.',
+
+  ownHome: 'Bydlíte ve vlastním?', rent: 'V nájmu', own: 'Ve vlastním',
+  homeValue: 'Hodnota nemovitosti', mortgageBalance: 'Zbývá splatit',
+  mortgageRate: 'Úrok, reálný', mortgageYears: 'Zbývá let',
+  rateHelp: 'Reálný znamená po odečtení inflace. Hypotéka za 5 % při 3% inflaci je zhruba 2 % reálně.',
+  homeHelp: 'Bydlení se nepočítá mezi peníze, které můžete utratit — někde bydlet musíte. Hypotéka se počítá a po jejím splacení vám zůstane víc.',
+  downsize: 'Plánujete se později přestěhovat do menšího?',
+  downsizeAge: 'Ve věku', downsizeRelease: 'Uvolní se',
+  downsizeHelp: 'Prodej a stěhování do levnějšího promění část bydlení v peníze k utracení.',
+
+  qRisk: 'Hodí se mincí o vašem celoživotním majetku.',
+  qRiskBody: 'Panna — všechno, co kdy budete mít, vzroste o pětinu. Orel — klesne o pětinu. Někdo vám nabídne, že to celé zruší. <b>Kolik nejvíc ze svého majetku byste mu za to dali?</b>',
+  qRiskNothing: 'Nic — házejme',
+  qRiskLots: 'Hodně — ať to skončí',
+  riskReadout: 'To znamená držet <b>{eq}</b> všeho, co máte a vyděláte, v akciích — což dnes odpovídá <b>{fw}</b> vašich úspor.',
+  riskFootnote: 'Takto ekonomové běžně měří vztah k riziku. Vaše odpověď odpovídá averzi k riziku asi {g}, kde 1 je odvážný a 10 velmi opatrný.',
+
+  qShape: 'Jaký průběh utrácení byste radši?',
+  qShapeOpts: ['Víc teď, méně později', 'Zhruba stejně po celou dobu', 'Méně teď, víc později'],
+  qShapeHelp: 'Neexistuje správná odpověď. Někdo chce peníze, dokud si jich užije; jiný chce mít jistotu na konci.',
+  shapeReadout: 'Vaše výdaje se budou reálně měnit asi o <b>{g}</b> ročně.',
+
+  qSmooth: 'Rok po odchodu do důchodu trhy výrazně spadnou. Co uděláte?',
+  qSmoothOpts: ['Utrácím dál pořád stejně, jak jsem plánoval', 'Trochu uberu a jedu dál', 'Poctivě škrtím a později doženu'],
+  qSmoothHelp: 'Udržet výdaje ve zlých letech je druh pojištění — a jako každé pojištění něco stojí.',
+
+  qAnnuity: 'Kolik z penzijních úspor byste proměnili v doživotní rentu?',
+  annNone: 'Nic', annAll: 'Všechno',
+  annReadout: 'Protože peníze těch, kdo zemřou dřív, financují ty, kdo žijí dlouho, můžete díky rentě utrácet víc — ale kapitál už není váš.',
+
+  qBequest: 'Chcete po sobě něco zanechat?',
+  beqOpts: ['Není to priorita', 'Konkrétní částku', 'Ať rozhodne model'],
+  beqAmount: 'Částka k zanechání',
+  beqHelp: 'Všechno, co zanecháte, je něco, co jste neutratili. Model ukáže cenu obou variant.',
+
+  fee: 'Poplatky za investice ročně',
+  feeHelp: 'Poplatky fondu i platformy. Očekávané výnosy se uvádějí před poplatky, takže se odečítají přímo z nich.',
+  feeReadout: 'Za celý život vás tento poplatek stojí asi <b>{loss}</b> ročních výdajů — <b>{pct}</b> toho, co byste jinak měli.',
+  rf: 'Reálná bezriziková sazba', horizon: 'Plán do věku',
+
+  heroLabel: 'Nad rámec nezbytných výdajů si můžete dovolit utrácet',
+  perYear: 'ročně', perMonth: 'měsíčně',
+  heroNote: 'To je {m} měsíčně, nebo {t} ročně včetně nezbytných výdajů{mort}. V dnešních cenách, do konce života.',
+  andMortgage: ' a hypotéky',
+  cardNetWorth: 'Ekonomické čisté jmění', cardEquity: 'Podíl akcií na úsporách',
+  cardPension: 'Starobní důchod', cardBequest: 'Zanecháno', cardFees: 'Celoživotní cena poplatků',
+  explain: 'Odkud se to číslo bere?',
+  divisorRow: 'rozloženo na (roky vážené pravděpodobností dožití)',
+  noSavingsShort: 'zatím není co rozdělovat',
+  noSavingsNote: 'Nemáte žádné úspory k investování. Otázka rozdělení přijde, až nějaké budete mít.',
+  noSavingsAlert: 'Bez úspor není co rozdělovat. Model přesto říká, že vaše budoucí příjmy se chovají jako dluhopis — takže jakmile začnete spořit, patří rovnováha do akcií.',
+
+  chSpend: 'Kolik můžete utrácet, rok po roce',
+  chSpendDesc: 'Nezbytné výdaje a hypotéka jsou podlaha. Pás ukazuje, jak může dopadnout zbytek.',
+  chWealth: 'Vaše bilance v čase',
+  chWealthDesc: 'Budoucí příjmy jsou aktivum, budoucí nezbytné výdaje závazek. Sledujte, jak si vymění místa.',
+  chGlide: 'Kolik úspor patří do akcií',
+  chGlideDesc: 'Vaše budoucí mzda se už chová jako velký dluhopis, takže model chce úspory naklonit opačně. Plná čára je to, co opravdu můžete držet.',
+  glideFalls: 'Podíl postupně klesá, jak se vyčerpává vaše budoucí mzda a jistota, kterou přináší.',
+  glideHump: 'Roste zhruba do {a} a pak klesá. Vzestup je splácení hypotéky: dokud ji dlužíte, jste už teď v krátké pozici v dluhopisu, což akcie brzdí.',
+  chSurv: 'Jak dlouho musí plán vydržet',
+  chSurvDesc: 'Pravděpodobnost, že alespoň jeden z vás bude naživu.',
+  chSurvSingle: 'Pravděpodobnost, že se dožijete každého věku.',
+  bsTitle: 'Dnešní bilance', bsDesc: 'Vše, co vlastníte a dlužíte, v ekonomickém smyslu.',
+
+  legTotal: 'Celkové výdaje, očekávané', legRange: 'Rozpětí možných výsledků',
+  legFloor: 'Nezbytné výdaje a hypotéka', legHC: 'Budoucí příjmy',
+  legSav: 'Úspory a investice', legLiab: 'Budoucí závazky',
+  legNW: 'Čisté jmění', legCan: 'Co můžete opravdu udělat',
+  legIdeal: 'Teoretické optimum (vyžaduje půjčku)', legHH: 'Alespoň jeden z vás',
+  legBoth: 'Oba naživu', legYou: 'Vy', legPartner: 'Partner',
+  retire: 'konec práce', pension: 'důchod',
+  assets: 'Aktiva', liabsNW: 'Závazky a čisté jmění',
+  rowSavings: 'Úspory a investice', rowHC: 'Budoucí příjmy po zdanění',
+  rowTotal: 'Celkem', rowEss: 'Budoucí nezbytné výdaje', rowMort: 'Zbývající hypotéka',
+  rowBeq: 'Odloženo na dědictví', rowNW: 'Čisté jmění — vaše k utracení',
+  value: 'Hodnota', share: 'Podíl',
+
+  alertNoSolution: 'Tenhle plán nevychází.',
+  alertNoSolutionBody: 'Nezbytné výdaje a dědictví spotřebují víc, než kolik máte a vyděláte. Snižte nezbytné výdaje, pracujte déle, nebo zanechte méně.',
+  alertThin: 'Zůstává velmi málo.',
+  alertThinBody: 'Nezbytné výdaje spolykají téměř všechny vaše celoživotní zdroje.',
+  alertGap: 'Máte díru v příjmech.',
+  alertGapBody: 'Mezi koncem práce v {a} a začátkem důchodu v {b} nemáte žádný příjem. Těchto {y} let platí jen úspory.',
+  alertEquity: 'Berte podíl akcií jako směr, ne jako příkaz.',
+  alertEquityBody: 'Protože ve vaší bilanci dominují budoucí příjmy, neomezená odpověď je {p}. Poctivě čteno: „držte v akciích tolik, kolik unesete“.',
+  alertLowEq: 'Vaše hypotéka plní roli dluhopisu.',
+  alertLowEqBody: 'Dlužíte {m} proti {f} úspor. Ekonomicky vzato jste už teď výrazně v krátké pozici v dluhopisu, takže model drží vaše úspory mimo akcie, dokud dluh neklesne. Mimořádné splátky hypotéky a investování jsou tu blízké náhražky.',
+  alertScotland: '', alertScotlandBody: '',
+
+  footHow: 'Odkud to pochází.',
+  footNotAdvice: 'Není to poradenství.',
+  footNotAdviceBody: 'Nepočítá s dětmi, rozvodem, ztrátou práce, dlouhodobou péčí ani se změnou zákonů. Výnosy jsou předpoklady, ne předpovědi. Před rozhodnutím se poraďte s odborníkem.',
+  printedOn: 'Vytištěno', summaryFor: 'Shrnutí plánu',
+},
+};
+</script>
+<script>/* ============================ application layer ============================ */
+const C = COUNTRIES[BUILD.country];
+const T = I18N[BUILD.lang];
+const CY = new Date().getFullYear();
+
+/* ------------------------------------------------------------------ state */
+function freshState() {
+  const D = C.defaults;
+  const by = CY - 35;
+  const pAge = Math.round(C.pensionAgeFor(by));
+  return {
+    couple: false,
+    people: [
+      { age: 35, sex: 1, health: 1, trajectory: 1, salary: D.salary,
+        workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate },
+      { age: 35, sex: 2, health: 1, trajectory: 1, salary: Math.round(D.salary * 0.85),
+        workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate },
+    ],
+    cbar: D.cbar,
+    savings: { ...D.savings },
+    own: true, homeValue: D.homeValue, mortgageBalance: D.mortgageBalance,
+    mortgageRate: D.mortgageRate, mortgageYears: D.mortgageYears,
+    downsize: false, downsizeAge: 72, downsizeRelease: 0.3,
+    riskPay: 0.05,          // willingness to pay to avoid the demon gamble
+    shape: 1,               // 0 = front-load, 1 = level, 2 = back-load
+    smooth: 1,              // 0 = keep steady, 1 = trim, 2 = cut and rebuild
+    alpha: 0.4,
+    beqMode: 'none', beqFixed: Math.round(D.salary * 5),
+    fee: C.defaultFee,
+    rf: C.rf, maxAge: 105,
+  };
+}
+let S = freshState();
+let touched = false, lastR = null;
+
+/* ----------------------------------------------------------------- format */
+const nf0 = new Intl.NumberFormat(C.locale, { style:'currency', currency:C.currency, maximumFractionDigits:0 });
+const nfC = new Intl.NumberFormat(C.locale, { style:'currency', currency:C.currency,
+                                              notation:'compact', compactDisplay:'short', maximumSignificantDigits:3 });
+const money = v => nf0.format(Math.round(v));
+const moneyK = v => nfC.format(v);
+const pct = (v,d=0) => (v*100).toFixed(d) + '%';
+const sym = (() => { const p = nf0.formatToParts(1).find(x=>x.type==='currency'); return p?p.value:''; })();
+const fill = (s, o) => s.replace(/\{(\w+)\}/g, (_,k)=> o[k] != null ? o[k] : '');
+
+/* -------------------------------------------------- preference conversion */
+/* The interface asks questions people can answer about themselves; these turn
+   the answers into the model's parameters. */
+function thetaFromAnswer() {
+  const gamma = riskAversionFromGamble(S.riskPay);
+  return Math.max(0.03, Math.min(3, thetaFromRiskAversion(gamma)));
+}
+const ETA_BY_SMOOTH = [0.25, 0.5, 1.0];          // steadier spending = lower EIS
+/* The spending-shape answer is inverted through the Euler equation. Real
+   spending grows at g = ((1+h)/(1+rho))^eta - 1, so a chosen slope implies rho. */
+function rhoFromShape(h, eta) {
+  const target = [-0.010, 0.0, 0.010][S.shape];   // real change per year
+  const rho = (1 + h) / Math.pow(1 + target, 1 / eta) - 1;
+  return Math.max(-0.02, Math.min(0.25, rho));
+}
+
+function buildParams() {
+  const people = (S.couple ? S.people : [S.people[0]]).map(p => ({
+    age: p.age, sex: p.sex,
+    healthShift: [-4, 0, 3, 7][p.health],
+    trajectory: [0.4, 1, 1.6][p.trajectory],
+    salary: p.salary,
+    workUntilAge: p.workUntilAge,
+    pensionAge: p.pensionAge,
+    // Passed explicitly so the country module compares the claim age with the
+    // statutory age on the SAME rounding basis the interface shows.
+    statutoryPensionAge: Math.round(C.pensionAgeFor(CY - p.age)),
+    employerPensionRate: p.employerPensionRate,
+    birthYear: CY - p.age,
+  }));
+  const theta = thetaFromAnswer();
+  const eta = ETA_BY_SMOOTH[S.smooth];
+  const cma = deriveCMA(0.2, globalStockFraction(), 0.15, globalStockFraction(), S.rf);
+  const hGross = theta === 1
+    ? (1 + S.rf) * Math.exp(0.5 * cma.sigmaSDF ** 2) - 1
+    : Math.pow(Math.pow(1 + S.rf, theta - 1) * Math.exp(0.5 * theta * (theta - 1) * cma.sigmaSDF ** 2),
+               1 / (theta - 1)) - 1;
+  const h = hGross - S.fee;
+  return {
+    people, cbar: S.cbar,
+    savings: { shares: S.savings.shares, bonds: S.savings.bonds,
+               cash: S.savings.cash, pension: S.savings.pension },
+    housing: S.own ? {
+      own: true, value: S.homeValue, mortgageBalance: S.mortgageBalance,
+      mortgageRate: S.mortgageRate, mortgageYearsLeft: S.mortgageYears,
+      downsizeAge: S.downsize ? S.downsizeAge : 0,
+      downsizeRelease: S.downsize ? S.downsizeRelease : 0,
+    } : { own: false },
+    maxAge: S.maxAge, curYear: CY,
+    theta, eta, rho: rhoFromShape(h, eta), alpha: S.alpha,
+    beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25, phi: 0.05,
+    eqHC: 0.2, eqLiab: 0.15, rf: S.rf, fee: S.fee,
+    pensionTaxHaircut: C.pensionTaxHaircut,
+  };
+}
+const ctx = {
+  mortalityTable: C.lifeTable,
+  salaryCurve: C.salaryCurve,
+  statePension: (person, hh) => C.statePension(person, hh),
+  tax: C.tax.bind(C),
+};
+
+/* ------------------------------------------------------------------- rail */
+const el = (tag, attrs, kids) => {
+  const e = document.createElement(tag);
+  for (const k in (attrs||{})) {
+    if (k === 'html') e.innerHTML = attrs[k];
+    else if (k === 'text') e.textContent = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  for (const c of (kids||[])) if (c) e.appendChild(c);
+  return e;
+};
+function fieldMoney(label, get, set, hint) {
+  const inp = el('input', { type:'number', step:'100', min:'0', 'aria-label':label });
+  inp.value = get();
+  inp.addEventListener('input', () => {
+    const raw = parseFloat(inp.value);
+    if (!Number.isFinite(raw)) return;
+    set(Math.max(0, raw)); touched = true; render();
+  });
+  inp.addEventListener('change', () => {
+    const cur = get();
+    if (Number.isFinite(cur) && String(cur) !== inp.value) inp.value = cur;
+  });
+  return el('div', { class:'field' }, [
+    el('span', { class:'flabel', text:label }),
+    el('div', { class:'money' }, [el('span', { class:'cur', text:sym }), inp]),
+    hint ? el('div', { class:'hint', text:hint }) : null,
+  ]);
+}
+function fieldNum(label, get, set, min, max, step, suffix) {
+  const inp = el('input', { type:'number', min, max, step, 'aria-label':label });
+  inp.value = get();
+  inp.addEventListener('input', () => {
+    const raw = parseFloat(inp.value);
+    if (!Number.isFinite(raw)) return;              // mid-edit, leave state alone
+    let v = Math.min(Number(max), Math.max(Number(min), raw));
+    // Whole-number fields (ages, years) must stay whole: a typed 67.5 would
+    // otherwise reach the model and surface as "0.5 years" in the copy.
+    if (Number(step) === 1) v = Math.round(v);
+    set(v); touched = true; render();
+  });
+  // Normalise what is shown once the user commits, so the field never displays
+  // something different from the value the model actually used.
+  inp.addEventListener('change', () => {
+    const cur = get();
+    if (Number.isFinite(cur) && String(cur) !== inp.value) inp.value = cur;
+  });
+  const box = suffix
+    ? el('div', { class:'withSuffix' }, [inp, el('span', { class:'suffix', text:suffix })])
+    : inp;
+  return el('div', { class:'field' }, [el('span', { class:'flabel', text:label }), box]);
+}
+function seg(label, opts, get, set, help, column) {
+  const box = el('div', { class:'seg' + (column ? ' col' : ''), role:'group' });
+  const btns = [];
+  opts.forEach((o, i) => {
+    const b = el('button', { type:'button', text:o });
+    b.addEventListener('click', () => { set(i); touched = true; render(); });
+    box.appendChild(b); btns.push(b);
+  });
+  /* The pressed state must be re-read on every render, not just at build time:
+     most of these controls do not rebuild the rail, so without this the model
+     recomputes but the button never lights up and the click looks dead. */
+  const paint = () => btns.forEach((b,i) => b.setAttribute('aria-pressed', String(get() === i)));
+  paint();
+  const kids = [];
+  if (label) {
+    const lab = el('span', { class:'flabel', text:label });
+    if (help) {
+      const q = el('button', { class:'qmark', type:'button', text:'?',
+                               'aria-label':label, 'aria-expanded':'false' });
+      const h = el('div', { class:'help', hidden:'' , text:help });
+      q.addEventListener('click', () => {
+        h.hidden = !h.hidden;
+        q.setAttribute('aria-expanded', String(!h.hidden));
+      });
+      lab.appendChild(q);
+      kids.push(lab, box, h);
+    } else kids.push(lab, box);
+  } else kids.push(box);
+  const f = el('div', { class:'field seg-field' }, kids);
+  f._update = paint;
+  return f;
+}
+function slider(label, get, set, min, max, step, fmt, lo, hi, readoutFn) {
+  const val = el('span', { class:'val', text:fmt(get()) });
+  const inp = el('input', { type:'range', min, max, step, 'aria-label':label });
+  inp.value = get();
+  const ro = el('div', { class:'readout' });
+  const upd = () => { val.textContent = fmt(get()); if (readoutFn) ro.innerHTML = readoutFn(); };
+  inp.addEventListener('input', () => { set(parseFloat(inp.value)); touched = true; render(); });
+  const f = el('div', { class:'field slider' }, [
+    el('div', { class:'top' }, [el('span', { class:'flabel', text:label }), val]),
+    inp,
+    el('div', { class:'scale' }, [el('span',{text:lo}), el('span',{text:hi})]),
+    readoutFn ? ro : null,
+  ]);
+  f._update = upd; upd();
+  return f;
+}
+function stepBox(n, title, kids, open) {
+  const s = el('details', { class:'step' });
+  if (open) s.setAttribute('open','');
+  s.appendChild(el('summary', {}, [el('span',{class:'stepnum',text:String(n)}), document.createTextNode(' '+title)]));
+  s.appendChild(el('div', { class:'stepbody' }, kids));
+  return s;
+}
+
+function personBlock(i) {
+  const p = S.people[i];
+  const title = i === 0 ? T.s2 : T.s2b;
+  const byNow = () => CY - p.age;
+  const kids = [
+    el('div', { class:'row2' }, [
+      fieldNum(T.age, ()=>p.age, v=>{
+        p.age = Math.max(18, Math.min(95, v));
+        const pa = Math.round(C.pensionAgeFor(CY - p.age));
+        p.pensionAge = pa;
+        if (p.workUntilAge > pa) p.workUntilAge = pa;
+      }, 18, 95, 1),
+      fieldMoney(T.salary, ()=>p.salary, v=>p.salary=Math.max(0,v)),
+    ]),
+    seg(T.sex, [T.male, T.female], ()=>p.sex-1, v=>p.sex=v+1, T.sexHelp),
+    seg(T.health, T.healthOpts, ()=>p.health, v=>p.health=v, T.healthHelp),
+    seg(T.trajectory, T.trajOpts, ()=>p.trajectory, v=>p.trajectory=v, T.trajHelp),
+    el('div', { class:'row2' }, [
+      fieldNum(T.stopWork, ()=>p.workUntilAge, v=>p.workUntilAge=Math.max(p.age, Math.min(85, v)), p.age, 85, 1),
+      fieldNum(T.pensionStarts, ()=>p.pensionAge, v=>p.pensionAge=Math.max(50, Math.min(85, v)), 50, 85, 1),
+    ]),
+    el('div', { class:'hint', text: T.pensionAuto + ': ' + Math.round(C.pensionAgeFor(byNow())) }),
+    fieldNum(T.employerPension, ()=>Math.round(p.employerPensionRate*1000)/10,
+             v=>p.employerPensionRate=v/100, 0, 30, 0.5, '%'),
+  ];
+  return el('div', { class:'person' }, [el('h4', { text:title }), ...kids]);
+}
+
+function buildRail() {
+  const rail = document.getElementById('rail');
+  rail.innerHTML = '';
+
+  rail.appendChild(stepBox(1, T.s1, [
+    seg(null, [T.justMe, T.couple], ()=>S.couple?1:0, v=>{
+      const now = !!v;
+      if (now !== S.couple) S.cbar = Math.round(now ? S.cbar / SINGLE_EQUIV : S.cbar * SINGLE_EQUIV);
+      S.couple = now;
+    }),
+  ], true));
+
+  const people = [personBlock(0)];
+  if (S.couple) people.push(personBlock(1));
+  rail.appendChild(stepBox(2, S.couple ? T.s2 + ' + ' + T.s2b : T.s2, people, true));
+
+  const sav = S.savings;
+  rail.appendChild(stepBox(3, T.s3, [
+    fieldMoney(T.essentials, ()=>S.cbar, v=>S.cbar=Math.max(0,v), T.essentialsHelp),
+    el('div', { class:'field' }, [
+      el('span', { class:'flabel', text:T.savings }),
+      el('div', { class:'row2' }, [
+        fieldMoney(T.savShares, ()=>sav.shares, v=>sav.shares=Math.max(0,v)),
+        fieldMoney(T.savBonds, ()=>sav.bonds, v=>sav.bonds=Math.max(0,v)),
+        fieldMoney(T.savCash, ()=>sav.cash, v=>sav.cash=Math.max(0,v)),
+        fieldMoney(T.savPension, ()=>sav.pension, v=>sav.pension=Math.max(0,v)),
+      ]),
+      el('div', { class:'hint', text:T.savHelp }),
+      el('div', { class:'hint', text:T.pensionPotNote }),
+    ]),
+  ], true));
+
+  const homeKids = [ seg(T.ownHome, [T.rent, T.own], ()=>S.own?1:0, v=>S.own=!!v, T.homeHelp) ];
+  if (S.own) {
+    homeKids.push(
+      el('div', { class:'row2' }, [
+        fieldMoney(T.homeValue, ()=>S.homeValue, v=>S.homeValue=Math.max(0,v)),
+        fieldMoney(T.mortgageBalance, ()=>S.mortgageBalance, v=>S.mortgageBalance=Math.max(0,v)),
+      ]),
+      el('div', { class:'row2' }, [
+        fieldNum(T.mortgageRate, ()=>Math.round(S.mortgageRate*1000)/10, v=>S.mortgageRate=v/100, -2, 15, 0.1, '%'),
+        fieldNum(T.mortgageYears, ()=>S.mortgageYears, v=>S.mortgageYears=Math.max(0,Math.min(50,v)), 0, 50, 1),
+      ]),
+      el('div', { class:'hint', text:T.rateHelp }),
+      seg(T.downsize, [T.no, T.yes], ()=>S.downsize?1:0, v=>S.downsize=!!v, T.downsizeHelp)
+    );
+    if (S.downsize) homeKids.push(el('div', { class:'row2' }, [
+      fieldNum(T.downsizeAge, ()=>S.downsizeAge, v=>S.downsizeAge=Math.max(50,Math.min(95,v)), 50, 95, 1),
+      fieldNum(T.downsizeRelease, ()=>Math.round(S.downsizeRelease*100), v=>S.downsizeRelease=v/100, 0, 100, 5, '%'),
+    ]));
+  }
+  rail.appendChild(stepBox(4, T.s4, homeKids, true));
+
+  const riskBox = el('div', { class:'qbox' }, [
+    el('div', { class:'qt', text:T.qRisk }),
+    el('div', { class:'qb', html:T.qRiskBody }),
+  ]);
+  const riskSlider = slider('', ()=>S.riskPay*100, v=>S.riskPay=v/100, 0.5, 20, 0.5,
+    v=>v.toFixed(1)+'%', T.qRiskNothing, T.qRiskLots,
+    () => {
+      const th = thetaFromAnswer();
+      const fw = lastR
+        ? (lastR.years[0].equityShareCon == null ? T.noSavingsShort : pct(lastR.years[0].equityShareCon))
+        : '—';
+      return fill(T.riskReadout, { eq: pct(Math.min(1,th)), fw })
+        + '<br><span style="opacity:.8">' + fill(T.riskFootnote, { g: riskAversionFromGamble(S.riskPay).toFixed(1) }) + '</span>';
+    });
+  riskBox.appendChild(riskSlider);
+
+  rail.appendChild(stepBox(5, T.s5, [
+    riskBox,
+    seg(T.qShape, T.qShapeOpts, ()=>S.shape, v=>S.shape=v, T.qShapeHelp, true),
+    el('div', { class:'readout', id:'shape-out' }),
+    seg(T.qSmooth, T.qSmoothOpts, ()=>S.smooth, v=>S.smooth=v, T.qSmoothHelp, true),
+    slider(T.qAnnuity, ()=>S.alpha*100, v=>S.alpha=v/100, 0, 100, 5, v=>v.toFixed(0)+'%',
+           T.annNone, T.annAll, ()=>T.annReadout),
+    seg(T.qBequest, T.beqOpts, ()=>({none:0,fixed:1,opt:2})[S.beqMode],
+        v=>S.beqMode=['none','fixed','opt'][v], T.beqHelp, true),
+    S.beqMode === 'fixed' ? fieldMoney(T.beqAmount, ()=>S.beqFixed, v=>S.beqFixed=Math.max(0,v)) : null,
+  ].filter(Boolean), true));
+
+  rail.appendChild(stepBox(6, T.s6, [
+    slider(T.fee, ()=>S.fee*100, v=>S.fee=v/100, 0, 3, 0.05, v=>v.toFixed(2)+'%',
+           '0%', '3%', () => {
+             if (!lastR || !lastR._fee) return T.feeHelp;
+             return fill(T.feeReadout, { loss: money(lastR._fee.annualLoss),
+                                         pct: pct(lastR._fee.pctLoss,1) });
+           }),
+    el('div', { class:'hint', text:T.feeHelp }),
+    el('div', { class:'row2' }, [
+      fieldNum(T.rf, ()=>Math.round(S.rf*1000)/10, v=>S.rf=v/100, -2, 8, 0.1, '%'),
+      fieldNum(T.horizon, ()=>S.maxAge, v=>S.maxAge=Math.max(70,Math.min(115,v)), 70, 115, 1),
+    ]),
+  ], false));
+}
+
+/* ----------------------------------------------------------------- charts */
+const CSSVAR = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function niceTicks(min, max, count) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) return [0, 1];
+  const span = max - min; if (span <= 0) return [min, min + 1];
+  const raw = span/(count||5), mag = Math.pow(10, Math.floor(Math.log10(raw))), norm = raw/mag;
+  const step = (norm<1.5?1:norm<3?2:norm<7?5:10)*mag;
+  const out=[]; for (let v=Math.ceil(min/step)*step; v<=max+step*.001; v+=step) out.push(v);
+  return out;
+}
+function frame(id, o) {
+  const svg = document.getElementById(id);
+  const W = 900, H = o.H || 340, m = { t:14, r:16, b:36, l:70 };
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (n,a) => { const e = document.createElementNS(NS,n); for (const k in a) e.setAttribute(k,a[k]); return e; };
+  const iw = W-m.l-m.r, ih = H-m.t-m.b;
+  // Guard the scales. Whatever the inputs, an SVG coordinate must be a number:
+  // a collapsed range or a non-finite value would otherwise reach the DOM.
+  const xSpan = (o.x1 - o.x0) || 1;
+  const ySpan = (o.y1 - o.y0) || 1;
+  const clampY = m.t - 1000, clampYmax = m.t + ih + 1000;
+  const x = v => Number.isFinite(v) ? m.l + (v-o.x0)/xSpan*iw : m.l;
+  const y = v => {
+    if (!Number.isFinite(v)) return m.t + ih;
+    const r = m.t + ih - (v-o.y0)/ySpan*ih;
+    return Math.max(clampY, Math.min(clampYmax, r));
+  };
+  const cid = 'clip-'+id;
+  const defs = mk('defs',{}); const cp = mk('clipPath',{id:cid});
+  cp.appendChild(mk('rect',{x:m.l,y:m.t-2,width:iw,height:ih+2}));
+  defs.appendChild(cp); svg.appendChild(defs);
+  const g = mk('g',{'clip-path':`url(#${cid})`}); svg.appendChild(g);
+  return { svg, mk, x, y, m, iw, ih, W, H, clip:g };
+}
+function axes(F, o) {
+  const grid = F.mk('g',{class:'grid'});
+  for (const t of o.yTicks) {
+    grid.appendChild(F.mk('line',{x1:F.m.l,x2:F.m.l+F.iw,y1:F.y(t),y2:F.y(t)}));
+    const tx = F.mk('text',{x:F.m.l-8,y:F.y(t)+4,'text-anchor':'end'});
+    tx.textContent = o.yFmt(t); F.svg.appendChild(tx);
+  }
+  F.svg.insertBefore(grid, F.svg.firstChild);
+  const ax = F.mk('g',{class:'axis'});
+  ax.appendChild(F.mk('line',{x1:F.m.l,x2:F.m.l+F.iw,y1:F.y(o.y0),y2:F.y(o.y0)}));
+  F.svg.appendChild(ax);
+  for (const t of o.xTicks) {
+    const tx = F.mk('text',{x:F.x(t),y:F.m.t+F.ih+22,'text-anchor':'middle'});
+    tx.textContent = Math.round(t); F.svg.appendChild(tx);
+  }
+}
+const path = pts => pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+function line(F, pts, stroke, w, dash) {
+  const a = { d: path(pts.map(p=>[F.x(p[0]),F.y(p[1])])), fill:'none', stroke,
+              'stroke-width':w||2, 'stroke-linejoin':'round', 'stroke-linecap':'round' };
+  if (dash) a['stroke-dasharray'] = dash;
+  F.clip.appendChild(F.mk('path', a));
+}
+function band(F, a, b, fill, op) {
+  const d = path(a.map(p=>[F.x(p[0]),F.y(p[1])])) + ' ' +
+    b.slice().reverse().map(p=>'L'+F.x(p[0]).toFixed(1)+' '+F.y(p[1]).toFixed(1)).join(' ') + ' Z';
+  F.clip.appendChild(F.mk('path',{d,fill,opacity:op==null?.16:op,stroke:'none'}));
+}
+function area(F, pts, y0, fill, op) {
+  const d = path(pts.map(p=>[F.x(p[0]),F.y(p[1])]))
+    + ` L ${F.x(pts[pts.length-1][0]).toFixed(1)} ${F.y(y0).toFixed(1)}`
+    + ` L ${F.x(pts[0][0]).toFixed(1)} ${F.y(y0).toFixed(1)} Z`;
+  F.clip.appendChild(F.mk('path',{d,fill,opacity:op==null?.18:op,stroke:'none'}));
+}
+function marker(F, xv, label, color) {
+  F.clip.appendChild(F.mk('line',{x1:F.x(xv),x2:F.x(xv),y1:F.m.t,y2:F.m.t+F.ih,
+    stroke:color,'stroke-width':1,'stroke-dasharray':'3 3',opacity:.6}));
+  const t = F.mk('text',{x:F.x(xv)+4,y:F.m.t+11,'text-anchor':'start',fill:color,'font-size':'10.5'});
+  t.textContent = label; F.svg.appendChild(t);
+}
+function note(F, text, color) {
+  const t = F.mk('text',{x:F.m.l+F.iw-4,y:F.m.t+12,'text-anchor':'end',fill:color,'font-size':'10.5'});
+  t.textContent = text; F.svg.appendChild(t);
+}
+function legend(id, items) {
+  document.getElementById(id).innerHTML = items.map(i =>
+    `<span><i class="swatch${i.band?' band':''}" style="background:${i.color}"></i>${i.label}</span>`).join('');
+}
+
+function drawSpend(R) {
+  const teal=CSSVAR('--teal'), brick=CSSVAR('--brick'), ink3=CSSVAR('--ink-3');
+  const ys=R.years, x0=ys[0].age, x1=ys[ys.length-1].age;
+  const floor = y => y.essentials + y.mortgage;
+  let ymax=0, y95=0;
+  for (const y of ys) { ymax=Math.max(ymax, y.bandsConsump[2]+floor(y), y.totalConsump);
+                        y95=Math.max(y95, y.bandsConsump[0]+floor(y)); }
+  const yT = niceTicks(0, ymax*1.1, 5);
+  const F = frame('ch-spend', { x0,x1,y0:0,y1:yT[yT.length-1],H:340 });
+  axes(F, { y0:0, yTicks:yT, xTicks:niceTicks(x0,x1,7).filter(v=>v>=x0&&v<=x1), yFmt:moneyK });
+  const P = k => ys.map(y=>[y.age, y.bandsConsump[k]+floor(y)]);
+  band(F,P(0),P(6),teal,.10); band(F,P(1),P(5),teal,.12); band(F,P(2),P(4),teal,.16);
+  area(F, ys.map(y=>[y.age,floor(y)]), 0, brick, .22);
+  line(F, ys.map(y=>[y.age,floor(y)]), brick, 1.75);
+  line(F, ys.map(y=>[y.age,y.totalConsump]), teal, 2.25);
+  const rt = R.retYear;
+  if (rt>0 && rt<=R.maxYear) marker(F, ys[rt].age, T.retire, ink3);
+  if (y95 > yT[yT.length-1]*1.05) note(F, moneyK(y95), teal);
+  legend('leg-spend',[{color:teal,label:T.legTotal},{color:teal,label:T.legRange,band:true},
+                      {color:brick,label:T.legFloor}]);
+}
+function drawWealth(R) {
+  const teal=CSSVAR('--teal'), amber=CSSVAR('--amber'), brick=CSSVAR('--brick'),
+        slate=CSSVAR('--slate'), ink3=CSSVAR('--ink-3');
+  const ys=R.years, x0=ys[0].age, x1=ys[ys.length-1].age;
+  let ymax=0, ymin=0;
+  for (const y of ys){ ymax=Math.max(ymax,y.humanCapital,y.netWorth,y.finWealth);
+                       ymin=Math.min(ymin,-y.liabilities); }
+  const yT = niceTicks(ymin, ymax, 6);
+  const F = frame('ch-wealth', { x0,x1,y0:yT[0],y1:yT[yT.length-1],H:340 });
+  axes(F, { y0:yT[0], yTicks:yT, xTicks:niceTicks(x0,x1,7).filter(v=>v>=x0&&v<=x1), yFmt:moneyK });
+  F.clip.appendChild(F.mk('line',{x1:F.m.l,x2:F.m.l+F.iw,y1:F.y(0),y2:F.y(0),stroke:ink3,'stroke-width':1}));
+  area(F, ys.map(y=>[y.age,y.humanCapital]), 0, amber, .16);
+  area(F, ys.map(y=>[y.age,-y.liabilities]), 0, brick, .16);
+  line(F, ys.map(y=>[y.age,y.humanCapital]), amber, 2);
+  line(F, ys.map(y=>[y.age,-y.liabilities]), brick, 2);
+  line(F, ys.map(y=>[y.age,y.finWealth]), teal, 2.25);
+  line(F, ys.map(y=>[y.age,y.netWorth]), slate, 2, '5 3');
+  const rt=R.retYear; if (rt>0&&rt<=R.maxYear) marker(F, ys[rt].age, T.retire, ink3);
+  legend('leg-wealth',[{color:amber,label:T.legHC},{color:teal,label:T.legSav},
+                       {color:brick,label:T.legLiab},{color:slate,label:T.legNW}]);
+}
+function drawGlide(R) {
+  const teal=CSSVAR('--teal'), ink3=CSSVAR('--ink-3'), violet=CSSVAR('--violet');
+  const ys=R.years, x0=ys[0].age, x1=ys[ys.length-1].age;
+  let peak=0; for (const y of ys) if (y.equityShareUncon != null) peak=Math.max(peak,y.equityShareUncon);
+  const yT = niceTicks(0, 1.08, 5);
+  const F = frame('ch-glide', { x0,x1,y0:0,y1:yT[yT.length-1],H:300 });
+  axes(F, { y0:0, yTicks:yT, xTicks:niceTicks(x0,x1,7).filter(v=>v>=x0&&v<=x1), yFmt:v=>pct(v) });
+  F.clip.appendChild(F.mk('line',{x1:F.m.l,x2:F.m.l+F.iw,y1:F.y(1),y2:F.y(1),
+    stroke:violet,'stroke-width':1,'stroke-dasharray':'2 3',opacity:.7}));
+  const defUn = ys.filter(y=>y.equityShareUncon != null);
+  const defCon = ys.filter(y=>y.equityShareCon != null);
+  if (defUn.length > 1) line(F, defUn.map(y=>[y.age,y.equityShareUncon]), ink3, 1.5, '4 3');
+  if (defCon.length > 1) line(F, defCon.map(y=>[y.age,y.equityShareCon]), teal, 2.5);
+  const rt=R.retYear; if (rt>0&&rt<=R.maxYear) marker(F, ys[rt].age, T.retire, ink3);
+  if (peak>1.08) note(F, pct(peak), ink3);
+  legend('leg-glide',[{color:teal,label:T.legCan},{color:ink3,label:T.legIdeal}]);
+  const now=ys[0], atRet=ys[Math.min(rt,R.maxYear)];
+  // Describe the shape the chart actually has rather than assuming it falls.
+  let peakIdx = 0;
+  ys.forEach((y,i)=>{ if ((y.equityShareCon ?? -1) > (ys[peakIdx].equityShareCon ?? -1)) peakIdx = i; });
+  const humped = peakIdx > 2 && ys[peakIdx].equityShareCon > now.equityShareCon * 1.15;
+  const shape = humped ? fill(T.glideHump, { a: ys[peakIdx].age }) : T.glideFalls;
+  const fmtShare = v => v == null ? T.noSavingsShort : pct(v);
+  document.getElementById('glide-note').innerHTML =
+    `<b>${fmtShare(now.equityShareCon)}</b> ${BUILD.lang==='cs'?'dnes':'today'} → ` +
+    `<b>${fmtShare(atRet.equityShareCon)}</b> (${T.retire}). ${shape}`;
+}
+function drawSurv(R) {
+  const violet=CSSVAR('--violet'), teal=CSSVAR('--teal'), amber=CSSVAR('--amber');
+  const ys=R.years, x0=ys[0].age, x1=ys[ys.length-1].age;
+  const F = frame('ch-surv', { x0,x1,y0:0,y1:1,H:250 });
+  axes(F, { y0:0, yTicks:[0,.25,.5,.75,1], xTicks:niceTicks(x0,x1,7).filter(v=>v>=x0&&v<=x1), yFmt:v=>pct(v) });
+  area(F, ys.map(y=>[y.age,y.survHousehold]), 0, violet, .14);
+  line(F, ys.map(y=>[y.age,y.survHousehold]), violet, 2.25);
+  const items = [{color:violet,label:S.couple?T.legHH:T.chSurvSingle}];
+  if (S.couple) {
+    line(F, ys.map(y=>[y.age,y.survBoth]), amber, 1.75, '4 3');
+    line(F, ys.map(y=>[y.age,y.survEach[0]]), teal, 1.25);
+    items.push({color:amber,label:T.legBoth},{color:teal,label:T.legYou});
+  }
+  let med=ys[0].age; for (const y of ys) if (y.survHousehold>=0.5) med=y.age;
+  marker(F, med, '50%', violet);
+  legend('leg-surv', items);
+}
+
+/* -------------------------------------------------------------- headline */
+function derivationHTML(R) {
+  const rows = [
+    ['', T.rowSavings, R.F0],
+    ['+', T.rowHC, R.H0],
+    ['−', T.rowEss, -R.L0Ess],
+    R.L0Mort > 0 ? ['−', T.rowMort, -R.L0Mort] : null,
+    R.L0Cash > 0 ? ['−', T.rowBeq, -R.L0Cash] : null,
+  ].filter(Boolean);
+  const body = rows.map(r =>
+    `<tr><td><span class="op">${r[0]}</span>${r[1]}</td><td>${money(Math.abs(r[2]))}</td></tr>`).join('');
+  return `<table>${body}
+    <tr class="sum"><td>${T.rowNW}</td><td>${money(R.W0)}</td></tr>
+    <tr><td><span class="op">÷</span>${T.divisorRow}</td><td>${R.D0.toFixed(1)}</td></tr>
+    <tr class="sum"><td>${T.heroLabel}</td><td>${money(R.CD0)}</td></tr></table>`;
+}
+function drawHeadline(R) {
+  const y0 = R.years[0];
+  const mortNote = R.mortgagePayment > 0 ? T.andMortgage : '';
+  const cards = [
+    { hero:true, k:T.heroLabel, accent:'var(--teal)',
+      v:`${money(R.CD0)} <span style="font-size:.5em;font-weight:400;color:var(--ink-2)">${T.perYear}</span>`,
+      n:fill(T.heroNote,{ m:money(R.CD0/12),
+                          t:money(R.CD0 + y0.essentials + y0.mortgage), mort:mortNote }),
+      why:true },
+    { k:T.cardNetWorth, v:moneyK(R.W0), accent:'var(--slate)',
+      n:`${moneyK(R.F0)} + ${moneyK(R.H0)} − ${moneyK(R.L0)}` },
+    { k:T.cardEquity,
+      v: y0.equityShareCon == null ? T.noSavingsShort : pct(y0.equityShareCon),
+      accent:'var(--teal)',
+      n: y0.equityShareCon == null ? T.noSavingsNote
+         : (y0.equityShareUncon > 1.05 ? `${T.legIdeal}: ${pct(y0.equityShareUncon)}` : '') },
+    { k:T.cardPension, v:moneyK(R._pension), accent:'var(--amber)',
+      n:`${C.code} · ${C.taxYear}` },
+  ];
+  if (R._fee && R._fee.annualLoss > 0) cards.push(
+    { k:T.cardFees, v:moneyK(R._fee.annualLoss), accent:'var(--brick)',
+      n:`${pct(R._fee.pctLoss,1)} · ${pct(S.fee,2)}` });
+  if (S.beqMode !== 'none') cards.push(
+    { k:T.cardBequest, v:moneyK(R.beq), accent:'var(--violet)', n:'' });
+
+  document.getElementById('headline').innerHTML = cards.map((c,i) =>
+    `<div class="stat${c.hero?' hero':''}" style="--accent:${c.accent}">
+       <div class="k">${c.k}</div><div class="v">${c.v}</div>
+       ${c.n?`<div class="n">${c.n}</div>`:''}
+       ${c.why?`<button class="why noprint" id="whybtn">${T.explain}</button>
+                <div class="derivation" id="deriv" hidden>${derivationHTML(R)}</div>`:''}
+     </div>`).join('');
+  const b = document.getElementById('whybtn');
+  if (b) b.addEventListener('click', () => {
+    const d = document.getElementById('deriv'); d.hidden = !d.hidden;
+  });
+}
+function drawAlerts(R) {
+  const A = [], y0 = R.years[0];
+  if (R.CD0 <= 0) A.push({t:'crit',h:T.alertNoSolution,b:T.alertNoSolutionBody});
+  else if (R.CD0 < S.cbar*0.08) A.push({t:'warn',h:T.alertThin,b:T.alertThinBody});
+  for (const p of (S.couple ? S.people : [S.people[0]])) {
+    if (p.workUntilAge < p.pensionAge) {
+      A.push({ t:'warn', h:T.alertGap,
+        b:fill(T.alertGapBody,{a:p.workUntilAge,b:p.pensionAge,y:p.pensionAge-p.workUntilAge}) });
+      break;
+    }
+  }
+  if (y0.equityShareCon != null && y0.equityShareCon < 0.15 && R.L0Mort > R.F0 * 0.8)
+    A.push({ t:'warn', h:T.alertLowEq,
+      b:fill(T.alertLowEqBody, { m: money(R.L0Mort), f: money(R.F0) }) });
+  if (y0.equityShareCon == null)
+    A.push({ t:'warn', h:T.noSavingsShort, b:T.noSavingsAlert });
+  if (y0.equityShareUncon != null && y0.equityShareUncon > 3)
+    A.push({t:'warn',h:T.alertEquity,b:fill(T.alertEquityBody,{p:pct(y0.equityShareUncon)})});
+  if (BUILD.country === 'UK' && T.alertScotland)
+    A.push({t:'warn',h:T.alertScotland,b:T.alertScotlandBody});
+  document.getElementById('alerts').innerHTML =
+    A.map(a=>`<div class="alert ${a.t}"><div><b>${a.h}</b> ${a.b}</div></div>`).join('');
+}
+function drawBalanceSheet(R) {
+  const tot = R.F0 + R.H0;
+  const pc = v => tot>0 ? pct(v/tot,1) : '—';
+  const row = (k,v,total) =>
+    `<tr${total?' class="total"':''}><td>${k}</td><td class="num">${money(v)}</td><td class="num">${pc(v)}</td></tr>`;
+  document.getElementById('bs-assets').innerHTML =
+    `<thead><tr><th></th><th>${T.value}</th><th>${T.share}</th></tr></thead><tbody>` +
+    row(T.rowSavings,R.F0) + row(T.rowHC,R.H0) + row(T.rowTotal,tot,true) + '</tbody>';
+  let liab = row(T.rowEss,R.L0Ess);
+  if (R.L0Mort>0) liab += row(T.rowMort,R.L0Mort);
+  if (R.L0Cash>0) liab += row(T.rowBeq,R.L0Cash);
+  document.getElementById('bs-liab').innerHTML =
+    `<thead><tr><th></th><th>${T.value}</th><th>${T.share}</th></tr></thead><tbody>` +
+    liab + row(T.rowNW,R.W0) + row(T.rowTotal,tot,true) + '</tbody>';
+}
+
+/* ----------------------------------------------------------------- render */
+function render() {
+  let R;
+  const bail = () => {
+    // Keep the last good results on screen and explain what happened, rather
+    // than replacing the whole page with a single line.
+    document.getElementById('alerts').innerHTML =
+      `<div class="alert crit"><div><b>${T.alertNoSolution}</b> ${T.alertNoSolutionBody}</div></div>`;
+  };
+  try { R = new Household(buildParams(), ctx).solve(); }
+  catch (e) { bail(); return; }
+  if (!Number.isFinite(R.CD0)) { bail(); return; }
+  // Fee impact and headline state pension, computed once per render.
+  const p = buildParams();
+  try {
+    const noFee = new Household({ ...p, fee: 0 }, ctx).solve();
+    R._fee = { annualLoss: noFee.CD0 - R.CD0,
+               pctLoss: noFee.CD0>0 ? (noFee.CD0-R.CD0)/noFee.CD0 : 0 };
+  } catch { R._fee = null; }
+  R._pension = p.people.reduce((s,person)=>s + ctx.statePension(person, null), 0);
+
+  lastR = R;
+  drawHeadline(R); drawAlerts(R);
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R);
+
+  const so = document.getElementById('shape-out');
+  if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
+  // Refresh every control's visible state without rebuilding the rail.
+  document.querySelectorAll('.field.slider, .field.seg-field').forEach(f => f._update && f._update());
+  writeURL();
+}
+
+/** Header shown only on the printed page. Filled on load and before printing
+    so it is present however the user reaches the print dialog. */
+function fillPrintHeader() {
+  const h = document.getElementById('printhead');
+  if (!h) return;
+  h.innerHTML =
+    `<div style="margin-bottom:14px">
+       <div class="eyebrow">${T.summaryFor} &middot; ${C.code} &middot; ${C.taxYear}</div>
+       <div style="font-family:var(--serif);font-size:20px;font-weight:600">${T.title}</div>
+       <div style="font-size:11px;color:var(--ink-3)">${T.printedOn} ${new Date().toLocaleDateString(C.locale)}
+         &middot; ${T.disclaimerBold}</div>
+     </div>`;
+}
+
+/* -------------------------------------------------------------- url state */
+function writeURL() {
+  const q = new URLSearchParams();
+  const D = freshState();
+  const put = (k,v,d)=>{ if (v !== d) q.set(k, typeof v==='number' ? String(+v.toFixed(4)) : String(v)); };
+  put('c', S.couple?1:0, 0);
+  S.people.forEach((p,i)=>{
+    if (i===1 && !S.couple) return;
+    const d = D.people[i];
+    put(`a${i}`,p.age,d.age); put(`s${i}`,p.sex,d.sex); put(`h${i}`,p.health,d.health);
+    put(`j${i}`,p.trajectory,d.trajectory); put(`y${i}`,p.salary,d.salary);
+    put(`w${i}`,p.workUntilAge,d.workUntilAge); put(`p${i}`,p.pensionAge,d.pensionAge);
+    put(`e${i}`,p.employerPensionRate,d.employerPensionRate);
+  });
+  put('cb',S.cbar,D.cbar);
+  put('vs',S.savings.shares,D.savings.shares); put('vb',S.savings.bonds,D.savings.bonds);
+  put('vc',S.savings.cash,D.savings.cash); put('vp',S.savings.pension,D.savings.pension);
+  put('ho',S.own?1:0,1); put('hv',S.homeValue,D.homeValue); put('hm',S.mortgageBalance,D.mortgageBalance);
+  put('hr',S.mortgageRate,D.mortgageRate); put('hy',S.mortgageYears,D.mortgageYears);
+  put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
+  put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
+  put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  const s = q.toString();
+  history.replaceState(null,'', s ? '?'+s : location.pathname);
+}
+function readURL() {
+  const q = new URLSearchParams(location.search);
+  if (![...q.keys()].length) return;
+  touched = true;
+  const num = (k,f)=>{ if(q.has(k)){ const v=parseFloat(q.get(k)); if(Number.isFinite(v)) f(v); } };
+  num('c',v=>S.couple=!!v);
+  for (let i=0;i<2;i++){
+    const p=S.people[i];
+    num(`a${i}`,v=>p.age=v); num(`s${i}`,v=>p.sex=v); num(`h${i}`,v=>p.health=v);
+    num(`j${i}`,v=>p.trajectory=v); num(`y${i}`,v=>p.salary=v);
+    num(`w${i}`,v=>p.workUntilAge=v); num(`p${i}`,v=>p.pensionAge=v);
+    num(`e${i}`,v=>p.employerPensionRate=v);
+  }
+  num('cb',v=>S.cbar=v);
+  num('vs',v=>S.savings.shares=v); num('vb',v=>S.savings.bonds=v);
+  num('vc',v=>S.savings.cash=v); num('vp',v=>S.savings.pension=v);
+  num('ho',v=>S.own=!!v); num('hv',v=>S.homeValue=v); num('hm',v=>S.mortgageBalance=v);
+  num('hr',v=>S.mortgageRate=v); num('hy',v=>S.mortgageYears=v);
+  num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
+  num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
+  num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
+  if (q.has('bq')) S.beqMode=q.get('bq');
+  num('bf',v=>S.beqFixed=v);
+}
+
+/* ------------------------------------------------------------------- init */
+function setText() {
+  const set=(id,v,html)=>{ const e=document.getElementById(id); if(e){ if(html) e.innerHTML=v; else e.textContent=v; } };
+  document.documentElement.lang = BUILD.lang;
+  set('t-title', T.title);
+  set('t-sub', T.sub);
+  set('t-discb', T.disclaimerBold); set('t-disc', T.disclaimer);
+  set('print', T.print); set('share', T.copyLink); set('reset', T.reset); set('theme', T.theme);
+  set('t-chSpend', T.chSpend); set('t-chSpendD', T.chSpendDesc);
+  set('t-chWealth', T.chWealth); set('t-chWealthD', T.chWealthDesc);
+  set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
+  set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
+  set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
+  set('t-assets', T.assets); set('t-liabs', T.liabsNW);
+  set('t-explain1', T.explain);
+  set('explain1', BUILD.lang === 'cs'
+    ? `<p>Model sečte všechno, co máte — úspory <em>i</em> každou korunu, kterou kdy vyděláte, po zdanění a v dnešních cenách — a odečte všechno, co musíte zaplatit: celoživotní nezbytné výdaje, zbytek hypotéky a případné dědictví. Co zbyde, je vaše <b>čisté jmění</b> v ekonomickém smyslu.</p>
+       <p>To pak vydělí číslem, které říká, přes kolik let se musí majetek rozprostřít — s ohledem na pravděpodobnost, že se každého roku dožijete, a na to, jak trpěliví jste. Výsledek je částka, kterou si letos můžete dovolit utratit, aniž byste ošidili svoje budoucí já.</p>
+       <p>Protože se budoucí příjmy počítají jako aktivum, může mít mladý člověk s malými úsporami vysoké čisté jmění — a plán mu řekne, ať utrácí víc, než by napovídal stav účtu.</p>`
+    : `<p>The model adds up everything you have — your savings <em>and</em> every pound you will ever earn, after tax and in today's money — then subtracts everything you must pay: a lifetime of essentials, the rest of the mortgage, and any inheritance you have committed to. What is left is your <b>net worth</b> in the economic sense.</p>
+       <p>It then divides that by a number representing how many years your wealth has to stretch across, weighted by the chance you are alive in each of them and by how patient you are. The result is what you can afford to spend this year without leaving your future self short.</p>
+       <p>Because future earnings count as an asset, a young person with almost no savings can still have a large net worth — and the plan will tell them to spend more than their bank balance alone suggests.</p>`, true);
+
+  const srcNote = BUILD.lang === 'cs'
+    ? `Úmrtnostní tabulky: ${C.lifeTable.source}. Mzdové křivky: ISPV. Daně a důchod: parametry ${C.taxYear}.`
+    : `Life tables: ${C.lifeTable.source}. Earnings curves: ONS ASHE. Tax and pension: ${C.taxYear} parameters.`;
+  document.getElementById('foot').innerHTML =
+    `<p><b>${T.footHow}</b> ${BUILD.lang==='cs'
+      ? 'Věrná reimplementace životního modelu z publikace <em>Lifetime Financial Advice</em> (Thomas M. Idzorek a Paul D. Kaplan, CFA Institute Research Foundation, 2024) a doprovodného sešitu © 2026 Paul D. Kaplan. Původní kód je licencován pro nekomerční užití; toto odvozené dílo tuto podmínku zachovává.'
+      : 'A faithful reimplementation of the parent life-cycle model in <em>Lifetime Financial Advice</em> by Thomas M. Idzorek and Paul D. Kaplan (CFA Institute Research Foundation, 2024), and of the accompanying workbook © 2026 Paul D. Kaplan. The original code is licensed for non-commercial use; this derivative keeps that restriction.'}</p>
+     <p>${srcNote}</p>
+     <p><b>${T.footNotAdvice}</b> ${T.footNotAdviceBody}</p>`;
+}
+
+function init() {
+  readURL();
+  setText();
+  buildRail();
+
+  document.getElementById('theme').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', cur ? (cur==='dark'?'light':'dark') : (sysDark?'light':'dark'));
+    render();
+  });
+  document.getElementById('reset').addEventListener('click', () => {
+    S = freshState(); touched = false; buildRail(); render();
+  });
+  document.getElementById('share').addEventListener('click', async () => {
+    const b = document.getElementById('share');
+    try { await navigator.clipboard.writeText(location.href); b.textContent = T.copied; }
+    catch { b.textContent = 'Ctrl+C'; }
+    setTimeout(()=>{ b.textContent = T.copyLink; }, 1800);
+  });
+  document.getElementById('print').addEventListener('click', () => window.print());
+  // Also fires for Ctrl+P and File > Print, not just our button.
+  window.addEventListener('beforeprint', fillPrintHeader);
+  fillPrintHeader();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+  window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
+
+  render();
+}
+
+/* The rail is rebuilt whenever its structure changes (couple toggled, home
+   toggled, bequest mode changed); otherwise only the readouts refresh. */
+let _lastShape = '';
+const _render = render;
+render = function () {
+  const shape = [S.couple, S.own, S.downsize, S.beqMode].join('|');
+  if (shape !== _lastShape) { _lastShape = shape; buildRail(); setText(); }
+  _render();
+};
+
+document.addEventListener('DOMContentLoaded', init);
+</script>

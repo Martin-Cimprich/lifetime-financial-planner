@@ -1,0 +1,13 @@
+# Third-party copyrighted works — not ours to redistribute.
+# The Idzorek-Kaplan workbook (c) 2026 Paul D. Kaplan and the CFA Institute
+# Research Foundation user manual are available from the Research Foundation.
+*.xlsm
+*.xlsb
+IK Excel Lifecycle Model*.pdf
+
+# Local scratch
+.playwright-mcp/
+*.log
+print-*.pdf
+node_modules/
+.claude/
