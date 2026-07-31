@@ -157,3 +157,80 @@ than a rule of thumb. Two findings worth noting:
 
 **C — income protection with real incidence rates** is next, pending disability incidence
 data by age for both countries.
+
+
+---
+
+# Built: C, with real incidence data
+
+## Where I was wrong
+
+I told you risk aversion barely matters to how much cover you buy. **That was half right and the
+half I got wrong is the interesting half.**
+
+Mossin's theorem says that at an *actuarially fair* price, full cover is optimal for anyone
+risk-averse at all. That part holds — the model reproduces it, buying 104–110% of full cover
+at zero loading regardless of temperament. But real insurance carries a margin, and once it
+does, risk aversion matters a great deal:
+
+| Risk aversion over consumption | Cover bought, at a 50% margin |
+|---|---|
+| RRA 1 (log utility) | 34% of full |
+| RRA 2 | 77% |
+| RRA 4 | 89% |
+
+That is not second-order. So the honest statement is: **how much you need** is set by your
+balance sheet; **how much is worth buying** is set by the price *and* your risk aversion
+together. I have corrected the tool's copy accordingly.
+
+## The data
+
+**UK** — CMI Working Paper 48 (IPM 1991-98), claim inception intensities per 1,000 healthy
+lives, **52-week deferred period**, males occupation class 1, single years of age. WP48 is the
+most recent fully public CMI table; IP06 and IP11 are subscriber-only. Scaled by 0.65 to bring
+1991-98 experience to current levels, using WP48's own actual-versus-expected ratios.
+
+The 52-week column is deliberate. Shorter deferred periods count people who later recover, and
+this model treats the loss as permanent — a claim that survives a full year off work is much
+closer to that.
+
+**Czechia** — derived from ČSSZ open data: newly awarded **third-degree** invalidity pensions
+(working capacity reduced by 70% or more) by five-year band, over the Eurostat population less
+those already receiving one. The 60-64 band is excluded because it turns down as people reach
+pension age, which is an artefact rather than a fall in morbidity.
+
+**The two agree.** At age 40, the UK table gives 0.75 per 1,000 and the Czech data 0.68 — from
+completely independent sources, thirty years apart, on different definitions. Both imply
+incidence **doubles every 8-9 years of age**. That doubling is the assumption actually doing
+the work; the levels are less certain than the shape.
+
+Occupation multipliers are CMI's own (1.0 / 1.2 / 1.6 / 2.5 across the four classes), and the
+female factor of 1.9 is from WP48 section 9.
+
+## What it changes
+
+Human capital is now weighted by the probability of still being able to earn. That is a real
+correction, not decoration: treating earnings as certain made the model **too optimistic about
+the young and too confident in its own advice**. A bond that can default is not a bond. Human
+capital falls 1-2% at 35 and more at older ages, spending falls with it, and the recommended
+equity share falls too.
+
+The panel reports four numbers: the chance it happens before you retire, the cover that makes
+you whole, the cover worth buying at the margin you set, and what that costs a year. For a UK
+median earner at 35 in a desk job: 11.0% chance, £25,707 of cover to be whole, £17,995 worth
+buying at a 50% margin, £793 a year. Heavy manual work more than doubles the chance to 25.3%
+and the premium to £1,801.
+
+## Honest limits
+
+- One representative disability age rather than the full timing distribution, so the spread of
+  outcomes is compressed even though the average is right.
+- Recovery is not modelled; every incidence is treated as permanent. The bias is conservative —
+  it makes insurance look more valuable than it is, not less.
+- The Czech rates are population-based and therefore an upper bound for a medically underwritten
+  life. The employment rate for 20-64s is 82%, and a disproportionate share of invalidity awards
+  go to people already out of work.
+- Czech premium data is genuinely poor. The only traceable published comparison is from 2012,
+  and the Czech market sells lump-sum invalidity riders rather than monthly income benefit, so
+  a UK-style price comparison does not map cleanly. The loading is therefore left as a slider
+  rather than pre-filled with a false precision.

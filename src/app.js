@@ -28,6 +28,7 @@ function freshState() {
     beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
     rf: C.rf, maxAge: 105, shockAge: 45,
+    occClass: 0, loading: 0.5,
   };
 }
 let S = freshState();
@@ -80,6 +81,7 @@ function buildParams() {
     // statutory age on the SAME rounding basis the interface shows.
     statutoryPensionAge: Math.round(C.pensionAgeFor(CY - p.age)),
     employerPensionRate: p.employerPensionRate,
+    occClass: S.occClass,
     birthYear: CY - p.age,
   }));
   const theta = thetaFromAnswer();
@@ -120,6 +122,10 @@ const ctx = {
   salaryCurve: C.salaryCurve,
   statePension: (person, hh) => C.statePension(person, hh),
   tax: C.tax.bind(C),
+  // Published disability incidence: earnings only arrive while you can earn.
+  hazard: (person, age) => disabilityRate(BUILD.country, age, person.sex, person.occClass ?? 0),
+  ability: (person, age) =>
+    abilityToWork(BUILD.country, person.age, age, person.sex, person.occClass ?? 0),
 };
 
 /* ------------------------------------------------------------------- rail */
@@ -658,6 +664,49 @@ function drawShock() {
         gap: money(Math.max(0, r.benefit - gross * marketMax)) });
 }
 
+/* Proposal C: income protection priced from published incidence, sized from the
+   household's own balance sheet. Slow enough (~0.5s) to run on demand rather
+   than on every keystroke. */
+let ipTimer = null, ipLast = null;
+function drawInsurance(force) {
+  const cards = document.getElementById('ip-cards');
+  const note = document.getElementById('ip-note');
+  if (!cards) return;
+  clearTimeout(ipTimer);
+  ipTimer = setTimeout(() => {
+    let r;
+    try { r = insuranceAnalysis(buildParams(), ctx, { loading: S.loading }); }
+    catch (e) { r = null; }
+    if (!r) { cards.innerHTML = ''; note.textContent = ''; return; }
+    ipLast = r;
+    const shareOfFull = r.needCover > 0 ? r.bestCover / r.needCover : 0;
+    const list = [
+      { k: T.ipProb, v: pct(r.probability, 1), accent: 'var(--brick)' },
+      { k: T.ipNeed, v: money(r.needCover), accent: 'var(--slate)' },
+      { k: T.ipBuy, v: money(r.bestCover), accent: 'var(--teal)' },
+      { k: T.ipPremium, v: money(r.bestPremium), accent: 'var(--amber)' },
+    ];
+    cards.innerHTML = list.map(c =>
+      `<div class="stat" style="--accent:${c.accent}">
+         <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
+    note.innerHTML = fill(T.ipNote, { share: pct(shareOfFull) }) +
+      '<br><span style="opacity:.85">' + T.ipNoteMossin + '</span>';
+    const src = document.getElementById('ip-source');
+    if (src) src.textContent = BUILD.country === 'CZ' ? T.ipSourceCZ : T.ipSourceUK;
+  }, force ? 0 : 350);
+}
+
+function buildInsuranceControls() {
+  const box = document.getElementById('ip-controls');
+  if (!box) return;
+  box.innerHTML = '';
+  box.appendChild(seg(T.ipOcc, T.ipOccOpts, () => S.occClass,
+                      v => { S.occClass = v; render(); }, T.ipOccHelp, true));
+  box.appendChild(slider(T.ipLoading, () => Math.round(S.loading * 100),
+    v => { S.loading = v / 100; render(); }, 0, 150, 5, v => v.toFixed(0) + '%',
+    '0%', '150%', () => T.ipLoadingHelp));
+}
+
 function drawBalanceSheet(R) {
   const tot = R.F0 + R.H0;
   const pc = v => tot>0 ? pct(v/tot,1) : '—';
@@ -697,7 +746,7 @@ function render() {
 
   lastR = R;
   drawHeadline(R); drawAlerts(R);
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock();
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock(); drawInsurance();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
@@ -770,7 +819,7 @@ function writeURL() {
   put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
-  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge); put('oc',S.occClass,D.occClass); put('ld',S.loading,D.loading);
   const s = q.toString();
   history.replaceState(null,'', s ? '?'+s : location.pathname);
 }
@@ -796,7 +845,7 @@ function readURL() {
   num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
   num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
   num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
-  num('sa',v=>S.shockAge=v);
+  num('sa',v=>S.shockAge=v); num('oc',v=>S.occClass=v); num('ld',v=>S.loading=v);
   if (q.has('bq')) S.beqMode=q.get('bq');
   num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
 }
@@ -814,6 +863,8 @@ function setText() {
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
   set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
+  set('t-ipTitle', T.ipTitle); set('t-ipDesc', T.ipDesc);
+  set('t-ipExplainT', T.ipExplainT); set('ipExplain', T.ipExplain, true);
   set('t-shockTitle', T.shockTitle); set('t-shockDesc', T.shockDesc);
   set('t-shockAgeLabel', T.shockAgeLabel);
   set('t-shockExplainT', T.shockExplainT); set('shockExplain', T.shockExplain, true);
@@ -897,6 +948,7 @@ function init() {
   // Also fires for Ctrl+P and File > Print, not just our button.
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();
+  buildInsuranceControls();
   const sa = document.getElementById('shockAge');
   if (sa) {
     sa.value = S.shockAge;

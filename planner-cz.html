@@ -294,6 +294,18 @@ footer p{margin:0 0 7px;max-width:90ch}
         <div class="inner" id="shockExplain"></div></details>
     </section>
 
+    <section class="panel" id="panel-ip">
+      <header><h2 id="t-ipTitle"></h2><p class="desc" id="t-ipDesc"></p></header>
+      <div class="pbody">
+        <div class="row2" style="max-width:640px;margin-bottom:14px" id="ip-controls"></div>
+        <div class="headline" id="ip-cards" style="margin-bottom:14px"></div>
+        <div class="note" id="ip-note"></div>
+        <div class="hint" id="ip-source" style="margin-top:8px"></div>
+      </div>
+      <details class="explain"><summary id="t-ipExplainT"></summary>
+        <div class="inner" id="ipExplain"></div></details>
+    </section>
+
     <section class="panel">
       <header><h2 id="t-chSurv"></h2><p class="desc" id="t-chSurvD"></p></header>
       <div class="pbody">
@@ -399,6 +411,115 @@ const CZ_LIFE_TABLE = {
     ],
   },
 };
+
+/* ===========================================================================
+   Disability incidence — the probability that a working person permanently
+   loses the ability to earn.
+
+   UK: CMI Working Paper 48, Income Protection Model IPM 1991-98, claim
+   inception intensities per 1,000 healthy lives, deferred period 52 weeks,
+   males occupation class 1. The 52-week column is used deliberately: shorter
+   deferred periods count people who later recover, and this model treats the
+   loss as permanent. A claim that survives a full year off work is much closer
+   to permanent incapacity, and it is the column that lines up with the Czech
+   invalidity data — at age 40 the two agree to three decimal places, from
+   completely independent sources thirty years apart. WP48 is the most recent FULLY PUBLIC CMI table;
+   IP06 and IP11 are subscriber-only. Values below are quoted from Appendix A.4
+   at five-year ages and interpolated log-linearly in between.
+   https://www.actuaries.org.uk/system/files/documents/pdf/cmiwp48_0.pdf
+
+   The 1991-98 experience is materially heavier than modern business. WP48's own
+   actual-vs-expected table implies a DP26 ratio of about 0.70 for 2003-06, so
+   the UK level is scaled by 0.65 to bring it to current experience.
+
+   CZ: derived from CSSZ open data — newly awarded third-degree invalidity
+   pensions (working capacity reduced by 70% or more) by five-year age band,
+   divided by the Eurostat resident population less those already receiving an
+   invalidity pension. Third degree is the closest Czech analogue to "unable to
+   work". These are POPULATION rates, so they are an upper bound for a medically
+   underwritten life.
+   https://data.cssz.cz/dump/invalidita.csv
+
+   Both sources independently imply incidence roughly DOUBLING EVERY 8-9 YEARS
+   of age. That is the assumption actually doing the work here; the levels are
+   less certain than the shape.
+
+   CAVEAT worth stating plainly: even a 52-week claim is not always permanent,
+   so treating every incidence as a permanent loss overstates the damage
+   somewhat. The bias is conservative — it makes the case for insurance look
+   stronger than it is, not weaker.
+   =========================================================================== */
+
+/** CMI IPM 1991-98, DP52, male OC1, per 1,000 healthy lives per year. */
+const UK_DP52_PER_1000 = {
+  25: 0.67, 30: 0.61, 35: 0.75, 40: 1.15, 45: 1.98,
+  50: 3.50, 55: 5.92, 60: 9.26, 65: 13.29,
+};
+
+/** CSSZ 2024, third-degree invalidity, per 1,000 at risk, both sexes. */
+const CZ_3RD_PER_1000 = {
+  22: 0.396, 27: 0.305, 32: 0.407, 37: 0.582, 42: 0.751,
+  47: 1.241, 52: 1.826, 57: 2.938,
+  // The 60-64 band turns down because people reach state pension age, not
+  // because morbidity falls. Excluded deliberately.
+};
+
+/** Modern-experience scaling for the 1991-98 UK table (WP48 A/E, DP52 = 0.63). */
+const UK_CURRENCY_SCALE = 0.65;
+
+/* Females show materially higher inception. WP48 section 9 gives ~190% at DP13
+   and says longer deferred periods are "perhaps a little higher". */
+const FEMALE_FACTOR = 1.9;
+
+/* CMI occupation classes, inception actual-vs-expected relative to class 1.
+   1 professional/clerical ... 4 heavy manual. */
+const OCCUPATION_FACTOR = [1.0, 1.2, 1.6, 2.5];
+
+const interp = (table, age) => {
+  const ages = Object.keys(table).map(Number).sort((a, b) => a - b);
+  const lo = ages[0], hi = ages[ages.length - 1];
+  if (age <= lo) return table[lo];
+  if (age >= hi) {
+    // Extrapolate on the observed doubling, rather than flat-lining.
+    const last = table[hi], prev = table[ages[ages.length - 2]];
+    const perYear = Math.pow(last / prev, 1 / (hi - ages[ages.length - 2]));
+    return last * Math.pow(perYear, age - hi);
+  }
+  let i = 0; while (ages[i + 1] < age) i++;
+  const a0 = ages[i], a1 = ages[i + 1];
+  const f = (age - a0) / (a1 - a0);
+  return Math.exp(Math.log(table[a0]) * (1 - f) + Math.log(table[a1]) * f);
+};
+
+/**
+ * Annual probability of permanently losing the ability to earn.
+ * @param country 'UK' | 'CZ'
+ * @param age
+ * @param sex 1 male, 2 female
+ * @param occClass 0-3, CMI classes 1-4
+ */
+function disabilityRate(country, age, sex, occClass = 1) {
+  const base = country === 'CZ'
+    ? interp(CZ_3RD_PER_1000, age) / 1000
+    : interp(UK_DP52_PER_1000, age) / 1000 * UK_CURRENCY_SCALE;
+  // The Czech figure is already both-sexes, so only the UK table is sexed.
+  const sexF = (country === 'CZ') ? 1 : (sex === 2 ? FEMALE_FACTOR : 1);
+  return base * sexF * (OCCUPATION_FACTOR[occClass] ?? 1);
+}
+
+/** Probability of still being able to earn at `age`, starting able at `from`. */
+function abilityToWork(country, from, age, sex, occClass = 1) {
+  let p = 1;
+  for (let a = Math.floor(from); a < Math.floor(age); a++) {
+    p *= (1 - disabilityRate(country, a, sex, occClass));
+    if (p <= 0) return 0;
+  }
+  return p;
+}
+
+/** Cumulative probability of becoming unable to earn between two ages. */
+const probDisabledBefore = (country, from, to, sex, occClass = 1) =>
+  1 - abilityToWork(country, from, to, sex, occClass);
 
 /* ===========================================================================
    Life-cycle planner engine, v2.
@@ -842,15 +963,25 @@ class Household {
   grossIncome(i, t) {
     const person = this.people[i];
     const age = person.age + t;
-    const out = { salary: 0, statePension: 0, employerPension: 0, disabilityBenefit: 0 };
+    const out = { salary: 0, statePension: 0, employerPension: 0,
+                  disabilityBenefit: 0, insurancePremium: 0 };
     if (age < person.workUntilAge) {
       out.salary = this.ctx.salaryCurve
         ? person.salary * this.ctx.salaryCurve(age, person) / this.ctx.salaryCurve(person.age, person)
         : person.salary;
+      /* Earnings are only received while you are able to earn. Without this the
+         model treats human capital as a risk-free bond, which is the one thing
+         it demonstrably is not: it makes the model too optimistic about the
+         young and too confident in its own advice. */
+      if (this.ctx.ability && !this.p.ignoreDisability) {
+        out.salary *= this.ctx.ability(person, age);
+      }
       // The employer's pension contribution is money you would not otherwise
       // receive, so it belongs in human capital. Your own contribution is not
       // extra income — it only moves money between pots — so it is excluded.
       out.employerPension = out.salary * (person.employerPensionRate || 0);
+      // Income-protection premiums are paid out of earnings while working.
+      out.insurancePremium = person.insurancePremium || 0;
     }
     if (age >= person.pensionAge) {
       out.statePension = person.statePensionOverride != null
@@ -876,8 +1007,9 @@ class Household {
     // UK and Czech income-protection benefits are paid free of income tax when
     // the policy is personally owned, so the benefit is added net.
     const benefit = g.disabilityBenefit || 0;
-    if (!this.ctx.tax) return g.salary + g.statePension + deferred + benefit;
-    return this.ctx.tax(g, this.people[i], t, this) + deferred + benefit;
+    const premium = g.insurancePremium || 0;
+    if (!this.ctx.tax) return g.salary + g.statePension + deferred + benefit - premium;
+    return this.ctx.tax(g, this.people[i], t, this) + deferred + benefit - premium;
   }
 
   /* --- solve ------------------------------------------------------------- */
@@ -1077,6 +1209,110 @@ function incomeShock(p, ctx, stopAge, who = 0) {
     lossPerYear: baseline.CD0 - noCover.CD0,
     lossPct: baseline.CD0 > 0 ? (baseline.CD0 - noCover.CD0) / baseline.CD0 : 0,
     yearsOfCover: Math.max(0, p.people[who].pensionAge - stopAge),
+  };
+}
+
+/**
+ * Income protection, priced and sized.
+ *
+ * Two states of the world: you keep earning, or you lose the ability to earn at
+ * the probability-weighted average age at which that happens. Cover replaces a
+ * fraction of net earnings from that point to state pension age, paid for by a
+ * premium while working.
+ *
+ * The premium is the actuarially fair cost (expected present value of benefits
+ * over expected present value of premium payments) times (1 + loading). Loading
+ * is where the market's margin lives, and it is the ONLY reason not to insure
+ * fully: with fair pricing, full cover maximises expected utility for any
+ * risk-averse person, however mildly risk-averse. That is Mossin's theorem, and
+ * it is why the cover you NEED is set by your balance sheet while the cover you
+ * BUY is set by the price.
+ *
+ * Simplification: one representative disability age rather than the full timing
+ * distribution. That keeps it fast enough to run live; it compresses the spread
+ * of outcomes but not their average.
+ */
+function insuranceAnalysis(p, ctx, opts = {}) {
+  const who = opts.who || 0;
+  const loading = opts.loading != null ? opts.loading : 0.5;
+  const person = p.people[who];
+  const start = person.age, end = person.pensionAge;
+  if (!ctx.ability || !ctx.hazard || end <= start) return null;
+
+  const pv = (yrs) => Math.pow(1 + p.rf, -yrs);
+  let survive = 1, pTotal = 0, ageWeighted = 0, pvBenefit = 0, pvPremium = 0;
+  for (let a = start; a < end; a++) {
+    const hz = ctx.hazard(person, a);
+    const pFail = survive * hz;
+    pTotal += pFail; ageWeighted += pFail * a;
+    for (let b = a; b < end; b++) pvBenefit += pFail * pv(b - start);
+    pvPremium += survive * pv(a - start);
+    survive *= (1 - hz);
+  }
+  const meanAge = pTotal > 0 ? ageWeighted / pTotal : (start + end) / 2;
+  const fairRate = pvPremium > 0 ? pvBenefit / pvPremium : 0;
+
+  const solveWith = (cover, premium, disabledAt) => {
+    const people = p.people.map((x, i) => i !== who ? x : {
+      ...x,
+      insurancePremium: premium,
+      ...(disabledAt == null ? {} : {
+        workUntilAge: Math.min(x.workUntilAge, disabledAt),
+        niYears: x.niYears != null ? x.niYears : Math.max(0, Math.min(35, x.workUntilAge - 21)),
+        insuredYears: x.insuredYears != null ? x.insuredYears : Math.max(0, Math.min(50, x.workUntilAge - 20)),
+        disabilityBenefit: cover,
+        disabilityFrom: disabledAt,
+        disabilityTo: x.pensionAge,
+        insurancePremium: 0,
+      }),
+    });
+    return new Household({ ...p, people, ignoreDisability: true }, ctx).solve();
+  };
+
+  const probe = new Household({ ...p, ignoreDisability: true }, ctx);
+  const t = Math.max(0, Math.round(meanAge - probe.baseAge));
+  const netAtFailure = Math.max(0, probe.netIncome(who, t));
+
+  const eta = p.eta;
+  const u = (c) => c <= 0 ? -1e12
+    : (eta === 1 ? Math.log(c) : Math.pow(c, (eta - 1) / eta) / ((eta - 1) / eta));
+
+  const evaluate = (frac) => {
+    const cover = frac * netAtFailure;
+    const premium = cover * fairRate * (1 + loading);
+    const able = solveWith(0, premium, null);
+    const hurt = solveWith(cover, premium, Math.round(meanAge));
+    return { frac, cover, premium, able, hurt,
+             eu: (1 - pTotal) * u(able.cHat) + pTotal * u(hurt.cHat) };
+  };
+
+  // Cover that leaves you equally well off either way: the "need" figure.
+  let lo = 0, hi = 3;
+  for (let k = 0; k < 12; k++) {
+    const mid = (lo + hi) / 2;
+    const r = evaluate(mid);
+    if (r.hurt.CD0 < r.able.CD0) lo = mid; else hi = mid;
+  }
+  const needFrac = (lo + hi) / 2;
+
+  // Cover that maximises expected utility at this loading.
+  const gr = (Math.sqrt(5) - 1) / 2;
+  let a2 = 0, b2 = Math.max(0.2, Math.min(2, needFrac * 1.4));
+  let c2 = b2 - gr * (b2 - a2), d2 = a2 + gr * (b2 - a2);
+  let fc = evaluate(c2).eu, fd = evaluate(d2).eu;
+  for (let k = 0; k < 9; k++) {
+    if (fc > fd) { b2 = d2; d2 = c2; fd = fc; c2 = b2 - gr * (b2 - a2); fc = evaluate(c2).eu; }
+    else { a2 = c2; c2 = d2; fc = fd; d2 = a2 + gr * (b2 - a2); fd = evaluate(d2).eu; }
+  }
+  const bestFrac = (a2 + b2) / 2;
+
+  const need = evaluate(needFrac), best = evaluate(bestFrac), none = evaluate(0);
+  return {
+    probability: pTotal, meanAge, fairRate, loading, netAtFailure,
+    need, best, none,
+    needCover: need.cover, bestCover: best.cover,
+    bestPremium: best.premium, needPremium: need.premium,
+    uninsuredLoss: none.able.CD0 - none.hurt.CD0,
   };
 }
 
@@ -1585,6 +1821,21 @@ en: {
   shockBenefit: 'Cover that would restore your plan', shockYears: 'Years it would need to pay',
   shockNoteOk: 'That benefit is <b>{p}</b> of your gross salary. Insurers usually cap income protection at 50–70%, so cover at the top of the market would leave you about <b>{gap}</b> a year short — still far better than nothing.',
   shockNoteBroken: 'Without cover this plan does not survive the shock at all: spending goes negative, meaning your essentials could not be met. The number above is what it would take to stay whole.',
+  ipTitle: 'Insuring the biggest thing you own',
+  ipDesc: 'Your earnings are your largest asset and the only one you cannot spread across a portfolio. This prices the risk that they stop.',
+  ipOcc: 'What kind of work do you do?',
+  ipOccOpts: ['Desk / professional', 'Mostly desk, some site work', 'Skilled manual', 'Heavy manual'],
+  ipOccHelp: 'Insurers price four occupation classes, and the spread is wide: heavy manual work carries about two and a half times the claim rate of desk work.',
+  ipLoading: 'Insurer\u2019s margin over the fair price',
+  ipLoadingHelp: 'What you pay above the actuarially fair cost \u2014 the insurer\u2019s expenses and profit. This is the single thing that decides how much cover is worth buying: at a fair price, full cover is best for anyone at all risk-averse. Real policies typically load 40\u2013100%.',
+  ipProb: 'Chance it happens before you retire', ipNeed: 'Cover that makes you whole',
+  ipBuy: 'Worth buying at this price', ipPremium: 'What that would cost you, a year',
+  ipNote: 'At a fair price you would insure <b>fully</b>. At this margin the balance tips at <b>{share}</b> of full cover \u2014 beyond that the premium costs you more than the protection is worth.',
+  ipNoteMossin: 'Insurance is worth buying because money matters more to you when you have little of it. That is why, priced fairly, even a mildly cautious person insures fully \u2014 and why the margin, not your nerve, is what decides where to stop.',
+  ipExplainT: 'How the cover figure is worked out',
+  ipExplain: '<p>Two futures are compared: one where you keep earning, and one where you lose the ability to earn at the age that is most likely on the published incidence rates. Cover replaces part of your net earnings from that point until your state pension starts, paid for by a premium while you are working.</p><p>The <b>cover that makes you whole</b> is the amount that leaves your sustainable spending the same either way. The <b>worth buying</b> figure is lower, because insurance is sold above its fair price: it is the point where one more pound of premium stops being worth the protection it buys.</p><p>Incidence comes from published data \u2014 the UK figures from the CMI\u2019s income-protection tables, the Czech from newly awarded third-degree invalidity pensions. Both imply the chance roughly doubles every eight to nine years of age.</p>',
+  ipSourceUK: 'Incidence: CMI Working Paper 48 (IPM 1991\u201398, 52-week deferred period), scaled to current experience.',
+  ipSourceCZ: 'V\u00fdskyt: nov\u011b p\u0159izn\u00e9 invalidn\u00ed d\u016fchody t\u0159et\u00edho stupn\u011b (\u010cSSZ 2024) na po\u010det osob v riziku.',
   shockExplainT: 'How is the cover figure worked out?',
   shockExplain: '<p>The model re-runs your whole plan with earnings stopping permanently at that age, keeping everything else the same. Your state pension is protected, because being unable to work earns you credits toward it.</p><p>It then searches for the level annual payment, running from that age to your state pension age, that would bring your sustainable spending back to where it is today. That figure is what your own balance sheet says you need — not a rule of thumb like &ldquo;60% of salary&rdquo;.</p><p>It is deliberately a <em>what-if</em>, not a forecast. It says nothing about how likely this is; it says what it would cost you.</p>',
 
@@ -1733,6 +1984,23 @@ cs: {
   chSurvDesc: 'Pravděpodobnost, že alespoň jeden z vás bude naživu.',
   chSurvSingle: 'Pravděpodobnost, že se dožijete každého věku.',
   bsTitle: 'Dnešní bilance', bsDesc: 'Vše, co vlastníte a dlužíte, v ekonomickém smyslu.',
+  ipTitle: 'Pojištění toho nejcennějšího, co máte',
+  ipDesc: 'Vaše budoucí příjmy jsou vaše největší aktivum a jediné, které nejde rozložit do portfolia. Tady se oceňuje riziko, že skončí.',
+  ipOcc: 'Jakou práci děláte?',
+  ipOccOpts: ['Kancelář / odborná', 'Většinou kancelář, občas terén', 'Kvalifikovaná manuální', 'Těžká manuální'],
+  ipOccHelp: 'Pojišťovny rozlišují čtyři rizikové skupiny a rozdíl je velký: těžká manuální práce má zhruba dva a půl krát vyšší škodnost než práce u stolu.',
+  ipLoading: 'Marže pojišťovny nad férovou cenou',
+  ipLoadingHelp: 'Kolik platíte nad aktuársky férovou cenu — náklady a zisk pojišťovny. Právě tohle rozhoduje, kolik krytí se vyplácí koupit: za férovou cenu se plně pojistí i mírně opatrný člověk. Reálné produkty mají marži obvykle 40–100 %.',
+  ipProb: 'Šance, že k tomu dojde před důchodem',
+  ipNeed: 'Krytí, které vás dostane zpět',
+  ipBuy: 'Kolik se při této ceně vyplácí',
+  ipPremium: 'Co by vás to stálo ročně',
+  ipNote: 'Za férovou cenu byste se pojistili <b>naplno</b>. Při této marži se rovnováha láme na <b>{share}</b> plného krytí — dál už pojistné stojí víc, než ochrana přináší.',
+  ipNoteMossin: 'Pojištění se vyplácí proto, že peníze mají větší cenu, když jich máte málo. Proto se za férovou cenu plně pojistí i mírně opatrný člověk — a proto o hranici rozhoduje marže i vaše opatrnost, ne jen jedno z toho.',
+  ipExplainT: 'Jak se krytí počítá',
+  ipExplain: '<p>Porovnávají se dvě budoucnosti: v jedné dál vyděláváte, ve druhé o schopnost vydělávat přijdete ve věku, který je podle publikovaných dat nejpravděpodobnější. Krytí nahradí část čistých příjmů až do starobního důchodu, za pojistné placené během práce.</p><p><b>Krytí, které vás dostane zpět</b> je částka, po níž jsou vaše udržitelné výdaje stejné tak i tak. Částka <b>kolik se vyplácí</b> je nižší, protože pojištění se prodává nad férovou cenou.</p><p>Výskyt vychází z publikovaných dat — česká z nově přiznaných invalidních důchodů třetího stupně (ČSSZ 2024), britská z tabulek CMI. Obojí ukazuje, že riziko se zhruba zdvojnásobí každých osm až devět let věku.</p>',
+  ipSourceUK: '',
+  ipSourceCZ: 'Výskyt: nově přiznané invalidní důchody třetího stupně (ČSSZ 2024) na počet osob v riziku. Populační míra, tedy horní odhad pro zdravotně upsaného klienta.',
   shockTitle: 'Co když nebudete moci pracovat?',
   shockDesc: 'Vaše budoucí příjmy jsou to největší, co máte — a jediné aktivum, které nejde rozložit. Tohle se stane, když skončí.',
   shockAgeLabel: 'Dejme tomu, že by váš příjem natrvalo skončil ve věku',
@@ -1805,6 +2073,7 @@ function freshState() {
     beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
     rf: C.rf, maxAge: 105, shockAge: 45,
+    occClass: 0, loading: 0.5,
   };
 }
 let S = freshState();
@@ -1857,6 +2126,7 @@ function buildParams() {
     // statutory age on the SAME rounding basis the interface shows.
     statutoryPensionAge: Math.round(C.pensionAgeFor(CY - p.age)),
     employerPensionRate: p.employerPensionRate,
+    occClass: S.occClass,
     birthYear: CY - p.age,
   }));
   const theta = thetaFromAnswer();
@@ -1897,6 +2167,10 @@ const ctx = {
   salaryCurve: C.salaryCurve,
   statePension: (person, hh) => C.statePension(person, hh),
   tax: C.tax.bind(C),
+  // Published disability incidence: earnings only arrive while you can earn.
+  hazard: (person, age) => disabilityRate(BUILD.country, age, person.sex, person.occClass ?? 0),
+  ability: (person, age) =>
+    abilityToWork(BUILD.country, person.age, age, person.sex, person.occClass ?? 0),
 };
 
 /* ------------------------------------------------------------------- rail */
@@ -2435,6 +2709,49 @@ function drawShock() {
         gap: money(Math.max(0, r.benefit - gross * marketMax)) });
 }
 
+/* Proposal C: income protection priced from published incidence, sized from the
+   household's own balance sheet. Slow enough (~0.5s) to run on demand rather
+   than on every keystroke. */
+let ipTimer = null, ipLast = null;
+function drawInsurance(force) {
+  const cards = document.getElementById('ip-cards');
+  const note = document.getElementById('ip-note');
+  if (!cards) return;
+  clearTimeout(ipTimer);
+  ipTimer = setTimeout(() => {
+    let r;
+    try { r = insuranceAnalysis(buildParams(), ctx, { loading: S.loading }); }
+    catch (e) { r = null; }
+    if (!r) { cards.innerHTML = ''; note.textContent = ''; return; }
+    ipLast = r;
+    const shareOfFull = r.needCover > 0 ? r.bestCover / r.needCover : 0;
+    const list = [
+      { k: T.ipProb, v: pct(r.probability, 1), accent: 'var(--brick)' },
+      { k: T.ipNeed, v: money(r.needCover), accent: 'var(--slate)' },
+      { k: T.ipBuy, v: money(r.bestCover), accent: 'var(--teal)' },
+      { k: T.ipPremium, v: money(r.bestPremium), accent: 'var(--amber)' },
+    ];
+    cards.innerHTML = list.map(c =>
+      `<div class="stat" style="--accent:${c.accent}">
+         <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
+    note.innerHTML = fill(T.ipNote, { share: pct(shareOfFull) }) +
+      '<br><span style="opacity:.85">' + T.ipNoteMossin + '</span>';
+    const src = document.getElementById('ip-source');
+    if (src) src.textContent = BUILD.country === 'CZ' ? T.ipSourceCZ : T.ipSourceUK;
+  }, force ? 0 : 350);
+}
+
+function buildInsuranceControls() {
+  const box = document.getElementById('ip-controls');
+  if (!box) return;
+  box.innerHTML = '';
+  box.appendChild(seg(T.ipOcc, T.ipOccOpts, () => S.occClass,
+                      v => { S.occClass = v; render(); }, T.ipOccHelp, true));
+  box.appendChild(slider(T.ipLoading, () => Math.round(S.loading * 100),
+    v => { S.loading = v / 100; render(); }, 0, 150, 5, v => v.toFixed(0) + '%',
+    '0%', '150%', () => T.ipLoadingHelp));
+}
+
 function drawBalanceSheet(R) {
   const tot = R.F0 + R.H0;
   const pc = v => tot>0 ? pct(v/tot,1) : '—';
@@ -2474,7 +2791,7 @@ function render() {
 
   lastR = R;
   drawHeadline(R); drawAlerts(R);
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock();
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock(); drawInsurance();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
@@ -2547,7 +2864,7 @@ function writeURL() {
   put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
-  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge); put('oc',S.occClass,D.occClass); put('ld',S.loading,D.loading);
   const s = q.toString();
   history.replaceState(null,'', s ? '?'+s : location.pathname);
 }
@@ -2573,7 +2890,7 @@ function readURL() {
   num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
   num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
   num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
-  num('sa',v=>S.shockAge=v);
+  num('sa',v=>S.shockAge=v); num('oc',v=>S.occClass=v); num('ld',v=>S.loading=v);
   if (q.has('bq')) S.beqMode=q.get('bq');
   num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
 }
@@ -2591,6 +2908,8 @@ function setText() {
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
   set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
+  set('t-ipTitle', T.ipTitle); set('t-ipDesc', T.ipDesc);
+  set('t-ipExplainT', T.ipExplainT); set('ipExplain', T.ipExplain, true);
   set('t-shockTitle', T.shockTitle); set('t-shockDesc', T.shockDesc);
   set('t-shockAgeLabel', T.shockAgeLabel);
   set('t-shockExplainT', T.shockExplainT); set('shockExplain', T.shockExplain, true);
@@ -2674,6 +2993,7 @@ function init() {
   // Also fires for Ctrl+P and File > Print, not just our button.
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();
+  buildInsuranceControls();
   const sa = document.getElementById('shockAge');
   if (sa) {
     sa.value = S.shockAge;

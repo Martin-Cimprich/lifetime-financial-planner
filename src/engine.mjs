@@ -440,15 +440,25 @@ export class Household {
   grossIncome(i, t) {
     const person = this.people[i];
     const age = person.age + t;
-    const out = { salary: 0, statePension: 0, employerPension: 0, disabilityBenefit: 0 };
+    const out = { salary: 0, statePension: 0, employerPension: 0,
+                  disabilityBenefit: 0, insurancePremium: 0 };
     if (age < person.workUntilAge) {
       out.salary = this.ctx.salaryCurve
         ? person.salary * this.ctx.salaryCurve(age, person) / this.ctx.salaryCurve(person.age, person)
         : person.salary;
+      /* Earnings are only received while you are able to earn. Without this the
+         model treats human capital as a risk-free bond, which is the one thing
+         it demonstrably is not: it makes the model too optimistic about the
+         young and too confident in its own advice. */
+      if (this.ctx.ability && !this.p.ignoreDisability) {
+        out.salary *= this.ctx.ability(person, age);
+      }
       // The employer's pension contribution is money you would not otherwise
       // receive, so it belongs in human capital. Your own contribution is not
       // extra income — it only moves money between pots — so it is excluded.
       out.employerPension = out.salary * (person.employerPensionRate || 0);
+      // Income-protection premiums are paid out of earnings while working.
+      out.insurancePremium = person.insurancePremium || 0;
     }
     if (age >= person.pensionAge) {
       out.statePension = person.statePensionOverride != null
@@ -474,8 +484,9 @@ export class Household {
     // UK and Czech income-protection benefits are paid free of income tax when
     // the policy is personally owned, so the benefit is added net.
     const benefit = g.disabilityBenefit || 0;
-    if (!this.ctx.tax) return g.salary + g.statePension + deferred + benefit;
-    return this.ctx.tax(g, this.people[i], t, this) + deferred + benefit;
+    const premium = g.insurancePremium || 0;
+    if (!this.ctx.tax) return g.salary + g.statePension + deferred + benefit - premium;
+    return this.ctx.tax(g, this.people[i], t, this) + deferred + benefit - premium;
   }
 
   /* --- solve ------------------------------------------------------------- */
@@ -675,6 +686,110 @@ export function incomeShock(p, ctx, stopAge, who = 0) {
     lossPerYear: baseline.CD0 - noCover.CD0,
     lossPct: baseline.CD0 > 0 ? (baseline.CD0 - noCover.CD0) / baseline.CD0 : 0,
     yearsOfCover: Math.max(0, p.people[who].pensionAge - stopAge),
+  };
+}
+
+/**
+ * Income protection, priced and sized.
+ *
+ * Two states of the world: you keep earning, or you lose the ability to earn at
+ * the probability-weighted average age at which that happens. Cover replaces a
+ * fraction of net earnings from that point to state pension age, paid for by a
+ * premium while working.
+ *
+ * The premium is the actuarially fair cost (expected present value of benefits
+ * over expected present value of premium payments) times (1 + loading). Loading
+ * is where the market's margin lives, and it is the ONLY reason not to insure
+ * fully: with fair pricing, full cover maximises expected utility for any
+ * risk-averse person, however mildly risk-averse. That is Mossin's theorem, and
+ * it is why the cover you NEED is set by your balance sheet while the cover you
+ * BUY is set by the price.
+ *
+ * Simplification: one representative disability age rather than the full timing
+ * distribution. That keeps it fast enough to run live; it compresses the spread
+ * of outcomes but not their average.
+ */
+export function insuranceAnalysis(p, ctx, opts = {}) {
+  const who = opts.who || 0;
+  const loading = opts.loading != null ? opts.loading : 0.5;
+  const person = p.people[who];
+  const start = person.age, end = person.pensionAge;
+  if (!ctx.ability || !ctx.hazard || end <= start) return null;
+
+  const pv = (yrs) => Math.pow(1 + p.rf, -yrs);
+  let survive = 1, pTotal = 0, ageWeighted = 0, pvBenefit = 0, pvPremium = 0;
+  for (let a = start; a < end; a++) {
+    const hz = ctx.hazard(person, a);
+    const pFail = survive * hz;
+    pTotal += pFail; ageWeighted += pFail * a;
+    for (let b = a; b < end; b++) pvBenefit += pFail * pv(b - start);
+    pvPremium += survive * pv(a - start);
+    survive *= (1 - hz);
+  }
+  const meanAge = pTotal > 0 ? ageWeighted / pTotal : (start + end) / 2;
+  const fairRate = pvPremium > 0 ? pvBenefit / pvPremium : 0;
+
+  const solveWith = (cover, premium, disabledAt) => {
+    const people = p.people.map((x, i) => i !== who ? x : {
+      ...x,
+      insurancePremium: premium,
+      ...(disabledAt == null ? {} : {
+        workUntilAge: Math.min(x.workUntilAge, disabledAt),
+        niYears: x.niYears != null ? x.niYears : Math.max(0, Math.min(35, x.workUntilAge - 21)),
+        insuredYears: x.insuredYears != null ? x.insuredYears : Math.max(0, Math.min(50, x.workUntilAge - 20)),
+        disabilityBenefit: cover,
+        disabilityFrom: disabledAt,
+        disabilityTo: x.pensionAge,
+        insurancePremium: 0,
+      }),
+    });
+    return new Household({ ...p, people, ignoreDisability: true }, ctx).solve();
+  };
+
+  const probe = new Household({ ...p, ignoreDisability: true }, ctx);
+  const t = Math.max(0, Math.round(meanAge - probe.baseAge));
+  const netAtFailure = Math.max(0, probe.netIncome(who, t));
+
+  const eta = p.eta;
+  const u = (c) => c <= 0 ? -1e12
+    : (eta === 1 ? Math.log(c) : Math.pow(c, (eta - 1) / eta) / ((eta - 1) / eta));
+
+  const evaluate = (frac) => {
+    const cover = frac * netAtFailure;
+    const premium = cover * fairRate * (1 + loading);
+    const able = solveWith(0, premium, null);
+    const hurt = solveWith(cover, premium, Math.round(meanAge));
+    return { frac, cover, premium, able, hurt,
+             eu: (1 - pTotal) * u(able.cHat) + pTotal * u(hurt.cHat) };
+  };
+
+  // Cover that leaves you equally well off either way: the "need" figure.
+  let lo = 0, hi = 3;
+  for (let k = 0; k < 12; k++) {
+    const mid = (lo + hi) / 2;
+    const r = evaluate(mid);
+    if (r.hurt.CD0 < r.able.CD0) lo = mid; else hi = mid;
+  }
+  const needFrac = (lo + hi) / 2;
+
+  // Cover that maximises expected utility at this loading.
+  const gr = (Math.sqrt(5) - 1) / 2;
+  let a2 = 0, b2 = Math.max(0.2, Math.min(2, needFrac * 1.4));
+  let c2 = b2 - gr * (b2 - a2), d2 = a2 + gr * (b2 - a2);
+  let fc = evaluate(c2).eu, fd = evaluate(d2).eu;
+  for (let k = 0; k < 9; k++) {
+    if (fc > fd) { b2 = d2; d2 = c2; fd = fc; c2 = b2 - gr * (b2 - a2); fc = evaluate(c2).eu; }
+    else { a2 = c2; c2 = d2; fc = fd; d2 = a2 + gr * (b2 - a2); fd = evaluate(d2).eu; }
+  }
+  const bestFrac = (a2 + b2) / 2;
+
+  const need = evaluate(needFrac), best = evaluate(bestFrac), none = evaluate(0);
+  return {
+    probability: pTotal, meanAge, fairRate, loading, netAtFailure,
+    need, best, none,
+    needCover: need.cover, bestCover: best.cover,
+    bestPremium: best.premium, needPremium: need.premium,
+    uninsuredLoss: none.able.CD0 - none.hurt.CD0,
   };
 }
 
