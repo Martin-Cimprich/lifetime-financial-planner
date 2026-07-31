@@ -232,5 +232,94 @@ and the premium to £1,801.
   go to people already out of work.
 - Czech premium data is genuinely poor. The only traceable published comparison is from 2012,
   and the Czech market sells lump-sum invalidity riders rather than monthly income benefit, so
-  a UK-style price comparison does not map cleanly. The loading is therefore left as a slider
-  rather than pre-filled with a false precision.
+  a UK-style price comparison does not map cleanly.
+
+
+---
+
+# Revision: the margin, the small-loss rule, and cover already held
+
+## The margin is now estimated, not asked
+
+Asking a lay user for the insurer's margin over the fair price produced an input that was
+really a guess wearing a number's clothes — and it is the single input that decides the
+answer. It is now estimated from the occupation question and shown in the assumptions box,
+where it can still be overridden.
+
+| Occupation class | UK | CZ |
+|---|---|---|
+| Desk / professional | 0.55 | 0.70 |
+| Mostly desk, some site work | 0.65 | 0.80 |
+| Skilled manual | 0.80 | 0.95 |
+| Heavy manual | 1.00 | 1.15 |
+
+UK anchoring: individual income-protection claims ratios in FCA value-measures and Swiss Re
+Term & Health Watch data sit near 55–60% of premium, implying a loading around 0.6–0.8. This
+model charges against a lightly-underwritten *population* rate rather than an insurer's select
+rate, which pulls the implied loading down — hence 0.55 for a desk job. Czech figures are a
+genuine guess set above the UK: a smaller, less competitive market is not a cheaper one.
+
+A side effect worth seeing: choosing heavy manual cuts the cover worth buying (£17.4k → £11.4k
+for the UK default) while **raising** the premium (£793 → £1,662). Higher risk and a higher
+margin push in opposite directions on quantity and price.
+
+## Campbell's self-insurance rule
+
+> *"If insurance has a 20% markup and your risk aversion is two, you should buy enough
+> insurance that your total wealth falls in the event of a loss by 20%/2 = 10%. If the loss is
+> small enough that even without insurance your wealth falls by less than that, you should
+> simply go without."* — Campbell, *Financial Decisions and Markets*
+
+Implemented as `selfInsureThreshold = loading × eta` (eta being 1/RRA), and reported next to
+the household's actual uninsured exposure. The rule is not decoration here: it is the
+first-order approximation of what `insuranceAnalysis` solves exactly, so the two can be
+checked against each other. They agree in the way theory says they should:
+
+| RRA | Markup | Rule says stop at | Exact solve leaves | Uninsured loss |
+|---|---|---|---|---|
+| 4 | 25% | 6.3% | 4.7% | 41% |
+| 4 | 100% | 25.0% | 15.8% | 41% |
+| 2 | 50% | 25.0% | 17.8% | 41% |
+| 1 | 50% | 50.0% | 33.6% | 41% |
+| 1 | 100% | 100.0% | 40.3% | 41% |
+
+The rule is a **valid upper bound** on residual exposure at every setting, and the exact
+solve's residual rises monotonically with `L/γ`. Both are asserted in `test-insurance.mjs`,
+along with Campbell's own worked example (20% markup, RRA 2 → 10.0%).
+
+**Where they part company, and why the copy says so.** The rule is derived for *small* risks.
+Losing your earnings is 41–57% of wealth, which is not small — so there is a band (RRA 1 at a
+50% markup) where the rule declines to insure something the exact solve still buys in
+quantity. The interface has three verdicts rather than two: worth insuring, below the line, or
+*"on that rule you could carry it yourself. The rule is built for small risks, though, and
+this one is not small: the exact calculation still finds £X a year worth buying."* Stating the
+rule's verdict as if it were the model's answer would have had the note contradict the
+headline card directly above it.
+
+The practical takeaway the rule exists to deliver is now in the copy: below that line, don't
+insure — *a phone, an extended warranty, a low motor excess.*
+
+## Cover already held
+
+A money field asks what an existing policy would pay, including employer schemes. It feeds
+three things:
+
+1. **The recommendation becomes a gap.** The card switches to "income cover still to buy" and
+   nets off what you hold; over-cover is flagged explicitly.
+2. **Human capital rises.** Cover pays in exactly the states where earnings stop, so expected
+   income gains `(1 − ability) × cover` to pension age. UK default: £900.3k → £906.2k with
+   £10k held, £935.4k with £60k. Bounded above by the no-risk-at-all case, which is asserted.
+3. **The allocation moves** — you were right that it would. The effect is real but modest, and
+   invisible in the default scenario because the long-only constraint pins equity at 100%.
+   With an interior allocation (age 52, £800k of savings, renting) holding £30k of cover takes
+   the equity share from **49.8% to 50.5%**.
+
+The total optimum is unchanged by what you already hold, which is the correct invariant: the
+right amount of cover is a fact about your balance sheet, not about your purchase history.
+
+## Removed
+
+The "what if you could not work?" panel (proposal B) and its `incomeShock` engine function.
+Proposal C answers the same question with probabilities attached, so B was a deterministic
+special case still occupying a screen. Fifty lines of now-unreachable engine code went with
+it rather than shipping dead in a self-contained file.

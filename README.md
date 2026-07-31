@@ -103,6 +103,8 @@ Both make the same mathematics more accurate rather than different, and both are
 | **Fees** | Capital market assumptions are quoted *gross* of costs, so a tool that feeds them in raw over-promises. Fees come off the return, scaled by the share of net worth that is actually financial — nobody pays a platform fee on their salary. |
 | **Job risk** | How share-like your earnings are drives how many shares your savings should hold. A civil servant's income is a bond; a founder's is not. |
 | **Early retirement** | "Stop working at" and "state pension starts at" are separate. Set the first below the second and the model shows the income gap and warns about it. |
+| **Disability risk** | Earnings arrive only while you can earn. Human capital is weighted by published disability incidence (CMI WP48 for the UK, ČSSZ invalidity awards for Czechia), which lowers human capital, spending and the recommended equity share. Treating a salary as a risk-free bond was the model's most flattering assumption. |
+| **Income protection** | Priced from that same incidence and sized from your own balance sheet: the chance it happens, the cover that makes you whole, the cover worth buying at the market's margin, and what it costs. The margin is estimated from your occupation rather than asked for. Campbell's self-insurance rule is shown alongside — and where the rule and the exact solve disagree, the copy says which is which. |
 
 ## Country data
 
@@ -140,9 +142,18 @@ Campbell's shorthand γ ≈ 2π/x² is the Arrow–Pratt approximation; it under
 above π ≈ 5%, so the code solves the equation exactly. The mapping is validated against
 Kimball–Sahm–Shapiro (2008) Table 1, which it reproduces to the published decimal.
 
-Patience is asked as a spending shape and inverted through the Euler equation. The bequest
-weight φ is deliberately **not** elicited — it has no lay interpretation — so the tool asks
-for a money target instead.
+Patience is asked as a spending shape and inverted through the Euler equation.
+
+The bequest weight φ has no lay interpretation, so the tool never names it: you either give a
+money target or answer *how much does leaving something matter to you?* on three settings.
+Leaving φ hard-coded, as it originally was, meant "let the model decide" was really an
+invisible assumption deciding — and the answer is highly sensitive to it (φ = 0.01 gives
+£117k where φ = 0.30 gives £243k on the same household).
+
+The insurer's margin is handled the same way. It is the single number that decides how much
+cover is worth buying and the one number a normal person cannot look up, so it is estimated
+from the occupation answer and left visible and overridable in the assumptions box rather
+than demanded as an input.
 
 ---
 

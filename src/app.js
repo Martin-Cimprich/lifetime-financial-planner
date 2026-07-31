@@ -27,12 +27,19 @@ function freshState() {
     alpha: 0.4,
     beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
-    rf: C.rf, maxAge: 105, shockAge: 45,
-    occClass: 0, loading: 0.5,
+    rf: C.rf, maxAge: 105,
+    occClass: 0,
+    existingCover: 0,
+    /* The insurer's margin is the one number that decides how much cover is
+       worth buying and the one number a normal person cannot know. It is
+       estimated from the occupation answer; null means "use the estimate". */
+    loadingOverride: null,
   };
 }
 let S = freshState();
 let touched = false, lastR = null;
+const effLoading = () =>
+  S.loadingOverride != null ? S.loadingOverride : marketLoading(BUILD.country, S.occClass);
 
 /* ----------------------------------------------------------------- format */
 const nf0 = new Intl.NumberFormat(C.locale, { style:'currency', currency:C.currency, maximumFractionDigits:0 });
@@ -82,6 +89,9 @@ function buildParams() {
     statutoryPensionAge: Math.round(C.pensionAgeFor(CY - p.age)),
     employerPensionRate: p.employerPensionRate,
     occClass: S.occClass,
+    // Cover already in force belongs to the first earner, who is the one the
+    // insurance panel sizes cover for.
+    existingCover: p === S.people[0] ? Math.max(0, S.existingCover || 0) : 0,
     birthYear: CY - p.age,
   }));
   const theta = thetaFromAnswer();
@@ -356,7 +366,7 @@ function buildRail() {
     el('div', { class:'readout', id:'shape-out' }),
     seg(T.qSmooth, T.qSmoothOpts, ()=>S.smooth, v=>S.smooth=v, T.qSmoothHelp, true),
     slider(T.qAnnuity, ()=>S.alpha*100, v=>S.alpha=v/100, 0, 100, 5, v=>v.toFixed(0)+'%',
-           T.annNone, T.annAll, ()=>T.annReadout),
+           T.annNone, T.annAll, ()=>T.annHelp),
     el('div', { class:'readout', id:'ann-out' }),
     seg(T.qBequest, T.beqOpts, ()=>({none:0,fixed:1,opt:2})[S.beqMode],
         v=>S.beqMode=['none','fixed','opt'][v], T.beqHelp, true),
@@ -379,6 +389,16 @@ function buildRail() {
       fieldNum(T.rf, ()=>Math.round(S.rf*1000)/10, v=>S.rf=v/100, -2, 8, 0.1, '%'),
       fieldNum(T.horizon, ()=>S.maxAge, v=>S.maxAge=Math.max(70,Math.min(115,v)), 70, 115, 1),
     ]),
+    /* The insurer's margin lives here rather than in the insurance panel: it
+       decides the answer, but asking a normal person for it produces a guess
+       dressed as an input. Estimated by occupation, visible and overridable. */
+    slider(T.ipLoading, () => Math.round(effLoading() * 100),
+           v => { S.loadingOverride = v / 100; }, 0, 150, 5, v => v.toFixed(0) + '%',
+           '0%', '150%',
+           () => fill(T.ipLoadingHelp, {
+             est: pct(marketLoading(BUILD.country, S.occClass)),
+             src: S.loadingOverride == null ? T.ipLoadingAuto : T.ipLoadingManual,
+           })),
   ], false));
 }
 
@@ -592,13 +612,18 @@ function drawHeadline(R) {
          : (y0.equityShareUncon > 1.05 ? `${T.legIdeal}: ${pct(y0.equityShareUncon)}` : '') },
     { k:T.cardPension, v:moneyK(R._pension), accent:'var(--amber)',
       n:`${C.code} · ${C.taxYear}` },
+    /* Filled in by paintIPCard when the insurance solve lands — it is far too
+       slow to run inside the headline redraw. */
+    { k:T.cardIP, v:'—', accent:'var(--brick)', n:'', ip:true },
   ];
   if (S.beqMode !== 'none') cards.push(
     { k:T.cardBequest, v:moneyK(R.beq), accent:'var(--violet)', n:'' });
 
   document.getElementById('headline').innerHTML = cards.map((c,i) =>
     `<div class="stat${c.hero?' hero':''}" style="--accent:${c.accent}">
-       <div class="k">${c.k}</div><div class="v">${c.v}</div>
+       <div class="k"${c.ip?' id="ip-headline-k"':''}>${c.k}</div>
+       <div class="v"${c.ip?' id="ip-headline-v"':''}>${c.v}</div>
+       ${c.ip?'<div class="n" id="ip-headline-n"></div>':''}
        ${c.n?`<div class="n">${c.n}</div>`:''}
        ${c.why?`<button class="why noprint" id="whybtn">${T.explain}</button>
                 <div class="derivation" id="deriv" hidden>${derivationHTML(R)}</div>`:''}
@@ -631,42 +656,9 @@ function drawAlerts(R) {
   document.getElementById('alerts').innerHTML =
     A.map(a=>`<div class="alert ${a.t}"><div><b>${a.h}</b> ${a.b}</div></div>`).join('');
 }
-/* Proposal B: what a permanent loss of earnings would cost, and the cover that
-   would undo it. Deterministic on purpose — it does not claim to know the odds,
-   only the consequence. */
-function drawShock() {
-  const box = document.getElementById('shock-cards');
-  const note = document.getElementById('shock-note');
-  if (!box) return;
-  const p = buildParams();
-  const person = p.people[0];
-  const stop = Math.max(person.age + 1, Math.min(person.pensionAge - 1, S.shockAge));
-  let r;
-  try { r = incomeShock(p, ctx, stop, 0); }
-  catch (e) { box.innerHTML = ''; note.textContent = ''; return; }
-
-  const cards = [
-    { k:T.shockSpend, v:money(r.noCover.CD0), accent:'var(--brick)' },
-    { k:T.shockLoss, v:money(Math.max(0, r.lossPerYear)), accent:'var(--brick)' },
-    { k:T.shockBenefit, v:money(r.benefit), accent:'var(--teal)' },
-    { k:T.shockYears, v:String(Math.max(0, person.pensionAge - stop)), accent:'var(--slate)' },
-  ];
-  box.innerHTML = cards.map(c =>
-    `<div class="stat" style="--accent:${c.accent}">
-       <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
-
-  const gross = p.people.reduce((s, x) => s + Math.max(0, x.salary), 0);
-  const share = gross > 0 ? r.benefit / gross : 0;
-  const marketMax = 0.70;
-  note.innerHTML = r.noCover.CD0 <= 0
-    ? T.shockNoteBroken
-    : fill(T.shockNoteOk, { p: pct(share),
-        gap: money(Math.max(0, r.benefit - gross * marketMax)) });
-}
-
-/* Proposal C: income protection priced from published incidence, sized from the
-   household's own balance sheet. Slow enough (~0.5s) to run on demand rather
-   than on every keystroke. */
+/* Income protection priced from published incidence, sized from the household's
+   own balance sheet. Slow enough (~0.5s) to run on demand rather than on every
+   keystroke, so the headline card it feeds is painted separately when it lands. */
 let ipTimer = null, ipLast = null;
 function drawInsurance(force) {
   const cards = document.getElementById('ip-cards');
@@ -675,25 +667,63 @@ function drawInsurance(force) {
   clearTimeout(ipTimer);
   ipTimer = setTimeout(() => {
     let r;
-    try { r = insuranceAnalysis(buildParams(), ctx, { loading: S.loading }); }
+    try { r = insuranceAnalysis(buildParams(), ctx, { loading: effLoading() }); }
     catch (e) { r = null; }
-    if (!r) { cards.innerHTML = ''; note.textContent = ''; return; }
+    if (!r) { cards.innerHTML = ''; note.textContent = ''; ipLast = null; paintIPCard(); return; }
     ipLast = r;
+    paintIPCard();
     const shareOfFull = r.needCover > 0 ? r.bestCover / r.needCover : 0;
     const list = [
       { k: T.ipProb, v: pct(r.probability, 1), accent: 'var(--brick)' },
       { k: T.ipNeed, v: money(r.needCover), accent: 'var(--slate)' },
-      { k: T.ipBuy, v: money(r.bestCover), accent: 'var(--teal)' },
-      { k: T.ipPremium, v: money(r.bestPremium), accent: 'var(--amber)' },
+      { k: S.existingCover > 0 ? T.ipBuyMore : T.ipBuy,
+        v: money(r.extraCover), accent: 'var(--teal)' },
+      { k: S.existingCover > 0 ? T.ipPremiumExtra : T.ipPremium,
+        v: money(r.extraPremium), accent: 'var(--amber)' },
     ];
     cards.innerHTML = list.map(c =>
       `<div class="stat" style="--accent:${c.accent}">
          <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
-    note.innerHTML = fill(T.ipNote, { share: pct(shareOfFull) }) +
-      '<br><span style="opacity:.85">' + T.ipNoteMossin + '</span>';
+
+    /* Campbell's rule: with a markup L and risk aversion gamma, stop insuring
+       once the remaining exposure is L/gamma of your wealth — and do not insure
+       at all anything smaller than that. Shown alongside what this household's
+       loss actually is, because the point only lands with both numbers.
+
+       The rule is a small-risk approximation and losing your earnings is not a
+       small risk, so on extreme settings it declines something the exact solve
+       still buys. Where they part company the copy says so rather than stating
+       the rule's verdict as if it were the answer above it. */
+    const verdict = r.worthInsuring ? T.ipSmallYes
+      : (r.bestCover > r.needCover * 0.15 ? T.ipSmallApprox : T.ipSmallNo);
+    const parts = [fill(T.ipNote, { share: pct(shareOfFull) })];
+    parts.push('<br><span style="opacity:.85">' + fill(T.ipSmallRule, {
+      load: pct(r.loading), rra: (1 / buildParams().eta).toFixed(0),
+      thr: pct(r.selfInsureThreshold),
+      loss: pct(r.uninsuredDrop),
+      verdict: fill(verdict, { buy: money(r.bestCover) }),
+    }) + '</span>');
+    if (r.overInsured) parts.push('<br><b>' + fill(T.ipOver, {
+      have: money(r.existingCover), want: money(r.bestCover) }) + '</b>');
+    note.innerHTML = parts.join('');
     const src = document.getElementById('ip-source');
     if (src) src.textContent = BUILD.country === 'CZ' ? T.ipSourceCZ : T.ipSourceUK;
   }, force ? 0 : 350);
+}
+
+/* The headline card is painted whenever the (slow) analysis lands, and left
+   showing its previous value in between rather than flickering to a dash. */
+function paintIPCard() {
+  const v = document.getElementById('ip-headline-v');
+  const k = document.getElementById('ip-headline-k');
+  const n = document.getElementById('ip-headline-n');
+  if (!v) return;
+  if (!ipLast) { v.textContent = '—'; if (n) n.textContent = ''; return; }
+  v.textContent = moneyK(ipLast.extraCover);
+  if (k) k.textContent = S.existingCover > 0 ? T.cardIPMore : T.cardIP;
+  if (n) n.textContent = ipLast.extraCover <= 0
+    ? T.cardIPNone
+    : fill(T.cardIPNote, { prem: money(ipLast.extraPremium) });
 }
 
 function buildInsuranceControls() {
@@ -702,9 +732,8 @@ function buildInsuranceControls() {
   box.innerHTML = '';
   box.appendChild(seg(T.ipOcc, T.ipOccOpts, () => S.occClass,
                       v => { S.occClass = v; render(); }, T.ipOccHelp, true));
-  box.appendChild(slider(T.ipLoading, () => Math.round(S.loading * 100),
-    v => { S.loading = v / 100; render(); }, 0, 150, 5, v => v.toFixed(0) + '%',
-    '0%', '150%', () => T.ipLoadingHelp));
+  box.appendChild(fieldMoney(T.ipHave, () => S.existingCover,
+                             v => S.existingCover = Math.max(0, v), T.ipHaveHelp));
 }
 
 function drawBalanceSheet(R) {
@@ -745,8 +774,8 @@ function render() {
   R._pension = p.people.reduce((s,person)=>s + ctx.statePension(person, null), 0);
 
   lastR = R;
-  drawHeadline(R); drawAlerts(R);
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock(); drawInsurance();
+  drawHeadline(R); drawAlerts(R); paintIPCard();
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawInsurance();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
@@ -819,7 +848,9 @@ function writeURL() {
   put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
-  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge); put('oc',S.occClass,D.occClass); put('ld',S.loading,D.loading);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  put('oc',S.occClass,D.occClass); put('ic',S.existingCover,D.existingCover);
+  if (S.loadingOverride != null) q.set('ld', String(S.loadingOverride));
   const s = q.toString();
   history.replaceState(null,'', s ? '?'+s : location.pathname);
 }
@@ -845,7 +876,8 @@ function readURL() {
   num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
   num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
   num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
-  num('sa',v=>S.shockAge=v); num('oc',v=>S.occClass=v); num('ld',v=>S.loading=v);
+  num('oc',v=>S.occClass=v); num('ic',v=>S.existingCover=v);
+  num('ld',v=>S.loadingOverride=v);
   if (q.has('bq')) S.beqMode=q.get('bq');
   num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
 }
@@ -865,11 +897,6 @@ function setText() {
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
   set('t-ipTitle', T.ipTitle); set('t-ipDesc', T.ipDesc);
   set('t-ipExplainT', T.ipExplainT); set('ipExplain', T.ipExplain, true);
-  set('t-shockTitle', T.shockTitle); set('t-shockDesc', T.shockDesc);
-  set('t-shockAgeLabel', T.shockAgeLabel);
-  set('t-shockExplainT', T.shockExplainT); set('shockExplain', T.shockExplain, true);
-  const sa = document.getElementById('shockAge');
-  if (sa && document.activeElement !== sa) sa.value = S.shockAge;
   set('t-assets', T.assets); set('t-liabs', T.liabsNW);
   set('t-explain1', T.explain);
   set('explain1', BUILD.lang === 'cs'
@@ -949,14 +976,6 @@ function init() {
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();
   buildInsuranceControls();
-  const sa = document.getElementById('shockAge');
-  if (sa) {
-    sa.value = S.shockAge;
-    sa.addEventListener('input', () => {
-      const v = parseFloat(sa.value);
-      if (Number.isFinite(v)) { S.shockAge = Math.round(Math.max(20, Math.min(80, v))); render(); }
-    });
-  }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
 

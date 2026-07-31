@@ -471,6 +471,15 @@ export class Household {
         age < (person.disabilityTo ?? -Infinity)) {
       out.disabilityBenefit = person.disabilityBenefit;
     }
+    /* Cover already in force pays in exactly the states where earnings stop, so
+       the expectation of income includes it: (probability disabled) x cover,
+       running to pension age as income protection does. This is the mirror of
+       the ability weighting above — together they say your earnings are risky
+       but the risk is partly already sold to someone else. */
+    if (person.existingCover > 0 && this.ctx.ability && !this.p.ignoreDisability
+        && age < person.pensionAge) {
+      out.disabilityBenefit += (1 - this.ctx.ability(person, age)) * person.existingCover;
+    }
     return out;
   }
 
@@ -640,56 +649,6 @@ export class Household {
 }
 
 /**
- * "What if I could not work from age X?"
- *
- * Re-solves with earnings stopping permanently at `stopAge` for person `who`,
- * then finds the level annual benefit, payable from that age to their state
- * pension age, that restores baseline spending. That benefit is the income
- * protection cover this household actually needs — derived from its own balance
- * sheet rather than a rule of thumb like "60% of salary".
- *
- * Deterministic: it answers "what would it cost" without claiming to know how
- * likely it is. The probability is layered on separately.
- */
-export function incomeShock(p, ctx, stopAge, who = 0) {
-  const baseline = new Household(p, ctx).solve();
-  const shocked = (benefit) => {
-    const people = p.people.map((person, i) => i !== who ? person : {
-      ...person,
-      workUntilAge: Math.min(person.workUntilAge, stopAge),
-      /* Being unable to work does not wipe out your state pension: the UK
-         credits National Insurance while you are on incapacity benefits, and
-         Czech invalidity counts as an insured period. Pin the record to the
-         career you would have had, or the shock double-counts the loss. */
-      niYears: person.niYears ?? Math.max(0, Math.min(35, person.workUntilAge - 21)),
-      insuredYears: person.insuredYears ?? Math.max(0, Math.min(50, person.workUntilAge - 20)),
-      // The benefit stops at state pension age, as income protection does.
-      disabilityBenefit: benefit,
-      disabilityFrom: stopAge,
-      disabilityTo: person.pensionAge,
-    });
-    return new Household({ ...p, people }, ctx).solve();
-  };
-  const noCover = shocked(0);
-  // Bisect on the benefit that restores baseline spending.
-  let lo = 0, hi = Math.max(1, p.people[who].salary * 3), mid = 0;
-  if (shocked(hi).CD0 < baseline.CD0) return {
-    baseline, noCover, benefit: hi, restored: shocked(hi), capped: true,
-  };
-  for (let k = 0; k < 60; k++) {
-    mid = (lo + hi) / 2;
-    if (shocked(mid).CD0 < baseline.CD0) lo = mid; else hi = mid;
-  }
-  const benefit = (lo + hi) / 2;
-  return {
-    baseline, noCover, benefit, restored: shocked(benefit), capped: false,
-    lossPerYear: baseline.CD0 - noCover.CD0,
-    lossPct: baseline.CD0 > 0 ? (baseline.CD0 - noCover.CD0) / baseline.CD0 : 0,
-    yearsOfCover: Math.max(0, p.people[who].pensionAge - stopAge),
-  };
-}
-
-/**
  * Income protection, priced and sized.
  *
  * Two states of the world: you keep earning, or you lose the ability to earn at
@@ -732,6 +691,9 @@ export function insuranceAnalysis(p, ctx, opts = {}) {
   const solveWith = (cover, premium, disabledAt) => {
     const people = p.people.map((x, i) => i !== who ? x : {
       ...x,
+      // The two states are modelled explicitly here, so the expected-value
+      // smear that represents cover in the baseline must not also fire.
+      existingCover: 0,
       insurancePremium: premium,
       ...(disabledAt == null ? {} : {
         workUntilAge: Math.min(x.workUntilAge, disabledAt),
@@ -784,12 +746,34 @@ export function insuranceAnalysis(p, ctx, opts = {}) {
   const bestFrac = (a2 + b2) / 2;
 
   const need = evaluate(needFrac), best = evaluate(bestFrac), none = evaluate(0);
+
+  /* Campbell's self-insurance rule. With a proportional markup L and relative
+     risk aversion gamma, the optimum leaves you still exposed to a fall of
+     about L/gamma; anything smaller than that is not worth insuring at all.
+     Here gamma = 1/eta over consumption, so the threshold is simply L*eta.
+     `residualDrop` is the same quantity read off the exact CRRA optimum, so
+     the two can be compared — the rule is the first-order approximation of
+     what this function solves exactly. */
+  const drop = (r) => r.able.CD0 > 0 ? (r.able.CD0 - r.hurt.CD0) / r.able.CD0 : 0;
+  const existing = Math.max(0, p.people[who].existingCover || 0);
+  const already = existing * fairRate * (1 + loading);
   return {
     probability: pTotal, meanAge, fairRate, loading, netAtFailure,
     need, best, none,
     needCover: need.cover, bestCover: best.cover,
     bestPremium: best.premium, needPremium: need.premium,
     uninsuredLoss: none.able.CD0 - none.hurt.CD0,
+    // What is left to do, given cover already in force.
+    existingCover: existing,
+    extraCover: Math.max(0, best.cover - existing),
+    extraPremium: Math.max(0, best.premium - already),
+    existingPremium: already,
+    overInsured: existing > best.cover * 1.1,
+    // Campbell's rule, and the exact answer it approximates.
+    uninsuredDrop: drop(none),
+    residualDrop: drop(best),
+    selfInsureThreshold: loading * p.eta,
+    worthInsuring: drop(none) > loading * p.eta,
   };
 }
 

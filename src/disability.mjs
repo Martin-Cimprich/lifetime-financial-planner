@@ -106,3 +106,32 @@ export function abilityToWork(country, from, age, sex, occClass = 1) {
 /** Cumulative probability of becoming unable to earn between two ages. */
 export const probDisabledBefore = (country, from, to, sex, occClass = 1) =>
   1 - abilityToWork(country, from, to, sex, occClass);
+
+/**
+ * What the market charges over the actuarially fair price, by occupation class.
+ *
+ * This is the single number that decides how much cover is worth buying, and it
+ * is the one number a normal person has no way to know — so it is estimated
+ * here rather than asked for.
+ *
+ * UK: individual income protection claims ratios published in the FCA value
+ * measures data and Swiss Re's Term & Health Watch sit around 55-60% of premium
+ * for standard occupations, which implies a loading in the region of 0.6-0.8.
+ * The rate this model charges against is a lightly-underwritten population rate
+ * rather than an insurer's own select rate, which pulls the implied loading
+ * down; 0.55 for a desk job is the central estimate after that adjustment.
+ * Heavier classes carry more because the per-policy expense is spread over a
+ * riskier, more anti-selected book.
+ *
+ * CZ: the market is thinner, sells invalidity riders rather than standalone
+ * benefit, and publishes almost nothing. The only traceable comparison is a
+ * 2012 vintage. These are therefore a genuine guess with a wide band, set
+ * higher than the UK because a smaller market with less competition is not a
+ * cheaper one. Overridable in the assumptions box for exactly this reason.
+ */
+export const LOADING_BY_OCCUPATION = {
+  UK: [0.55, 0.65, 0.80, 1.00],
+  CZ: [0.70, 0.80, 0.95, 1.15],
+};
+export const marketLoading = (country, occClass = 0) =>
+  (LOADING_BY_OCCUPATION[country] || LOADING_BY_OCCUPATION.UK)[occClass] ?? 0.6;

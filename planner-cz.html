@@ -278,22 +278,6 @@ footer p{margin:0 0 7px;max-width:90ch}
       </div></div>
     </section>
 
-    <section class="panel" id="panel-shock">
-      <header><h2 id="t-shockTitle"></h2><p class="desc" id="t-shockDesc"></p></header>
-      <div class="pbody">
-        <div class="row2" style="max-width:520px;margin-bottom:14px">
-          <div class="field">
-            <span class="flabel" id="t-shockAgeLabel"></span>
-            <input type="number" id="shockAge" min="20" max="80" step="1">
-          </div>
-        </div>
-        <div class="headline" id="shock-cards" style="margin-bottom:14px"></div>
-        <div class="note" id="shock-note"></div>
-      </div>
-      <details class="explain"><summary id="t-shockExplainT"></summary>
-        <div class="inner" id="shockExplain"></div></details>
-    </section>
-
     <section class="panel" id="panel-ip">
       <header><h2 id="t-ipTitle"></h2><p class="desc" id="t-ipDesc"></p></header>
       <div class="pbody">
@@ -520,6 +504,35 @@ function abilityToWork(country, from, age, sex, occClass = 1) {
 /** Cumulative probability of becoming unable to earn between two ages. */
 const probDisabledBefore = (country, from, to, sex, occClass = 1) =>
   1 - abilityToWork(country, from, to, sex, occClass);
+
+/**
+ * What the market charges over the actuarially fair price, by occupation class.
+ *
+ * This is the single number that decides how much cover is worth buying, and it
+ * is the one number a normal person has no way to know — so it is estimated
+ * here rather than asked for.
+ *
+ * UK: individual income protection claims ratios published in the FCA value
+ * measures data and Swiss Re's Term & Health Watch sit around 55-60% of premium
+ * for standard occupations, which implies a loading in the region of 0.6-0.8.
+ * The rate this model charges against is a lightly-underwritten population rate
+ * rather than an insurer's own select rate, which pulls the implied loading
+ * down; 0.55 for a desk job is the central estimate after that adjustment.
+ * Heavier classes carry more because the per-policy expense is spread over a
+ * riskier, more anti-selected book.
+ *
+ * CZ: the market is thinner, sells invalidity riders rather than standalone
+ * benefit, and publishes almost nothing. The only traceable comparison is a
+ * 2012 vintage. These are therefore a genuine guess with a wide band, set
+ * higher than the UK because a smaller market with less competition is not a
+ * cheaper one. Overridable in the assumptions box for exactly this reason.
+ */
+const LOADING_BY_OCCUPATION = {
+  UK: [0.55, 0.65, 0.80, 1.00],
+  CZ: [0.70, 0.80, 0.95, 1.15],
+};
+const marketLoading = (country, occClass = 0) =>
+  (LOADING_BY_OCCUPATION[country] || LOADING_BY_OCCUPATION.UK)[occClass] ?? 0.6;
 
 /* ===========================================================================
    Life-cycle planner engine, v2.
@@ -994,6 +1007,15 @@ class Household {
         age < (person.disabilityTo ?? -Infinity)) {
       out.disabilityBenefit = person.disabilityBenefit;
     }
+    /* Cover already in force pays in exactly the states where earnings stop, so
+       the expectation of income includes it: (probability disabled) x cover,
+       running to pension age as income protection does. This is the mirror of
+       the ability weighting above — together they say your earnings are risky
+       but the risk is partly already sold to someone else. */
+    if (person.existingCover > 0 && this.ctx.ability && !this.p.ignoreDisability
+        && age < person.pensionAge) {
+      out.disabilityBenefit += (1 - this.ctx.ability(person, age)) * person.existingCover;
+    }
     return out;
   }
 
@@ -1163,56 +1185,6 @@ class Household {
 }
 
 /**
- * "What if I could not work from age X?"
- *
- * Re-solves with earnings stopping permanently at `stopAge` for person `who`,
- * then finds the level annual benefit, payable from that age to their state
- * pension age, that restores baseline spending. That benefit is the income
- * protection cover this household actually needs — derived from its own balance
- * sheet rather than a rule of thumb like "60% of salary".
- *
- * Deterministic: it answers "what would it cost" without claiming to know how
- * likely it is. The probability is layered on separately.
- */
-function incomeShock(p, ctx, stopAge, who = 0) {
-  const baseline = new Household(p, ctx).solve();
-  const shocked = (benefit) => {
-    const people = p.people.map((person, i) => i !== who ? person : {
-      ...person,
-      workUntilAge: Math.min(person.workUntilAge, stopAge),
-      /* Being unable to work does not wipe out your state pension: the UK
-         credits National Insurance while you are on incapacity benefits, and
-         Czech invalidity counts as an insured period. Pin the record to the
-         career you would have had, or the shock double-counts the loss. */
-      niYears: person.niYears ?? Math.max(0, Math.min(35, person.workUntilAge - 21)),
-      insuredYears: person.insuredYears ?? Math.max(0, Math.min(50, person.workUntilAge - 20)),
-      // The benefit stops at state pension age, as income protection does.
-      disabilityBenefit: benefit,
-      disabilityFrom: stopAge,
-      disabilityTo: person.pensionAge,
-    });
-    return new Household({ ...p, people }, ctx).solve();
-  };
-  const noCover = shocked(0);
-  // Bisect on the benefit that restores baseline spending.
-  let lo = 0, hi = Math.max(1, p.people[who].salary * 3), mid = 0;
-  if (shocked(hi).CD0 < baseline.CD0) return {
-    baseline, noCover, benefit: hi, restored: shocked(hi), capped: true,
-  };
-  for (let k = 0; k < 60; k++) {
-    mid = (lo + hi) / 2;
-    if (shocked(mid).CD0 < baseline.CD0) lo = mid; else hi = mid;
-  }
-  const benefit = (lo + hi) / 2;
-  return {
-    baseline, noCover, benefit, restored: shocked(benefit), capped: false,
-    lossPerYear: baseline.CD0 - noCover.CD0,
-    lossPct: baseline.CD0 > 0 ? (baseline.CD0 - noCover.CD0) / baseline.CD0 : 0,
-    yearsOfCover: Math.max(0, p.people[who].pensionAge - stopAge),
-  };
-}
-
-/**
  * Income protection, priced and sized.
  *
  * Two states of the world: you keep earning, or you lose the ability to earn at
@@ -1255,6 +1227,9 @@ function insuranceAnalysis(p, ctx, opts = {}) {
   const solveWith = (cover, premium, disabledAt) => {
     const people = p.people.map((x, i) => i !== who ? x : {
       ...x,
+      // The two states are modelled explicitly here, so the expected-value
+      // smear that represents cover in the baseline must not also fire.
+      existingCover: 0,
       insurancePremium: premium,
       ...(disabledAt == null ? {} : {
         workUntilAge: Math.min(x.workUntilAge, disabledAt),
@@ -1307,12 +1282,34 @@ function insuranceAnalysis(p, ctx, opts = {}) {
   const bestFrac = (a2 + b2) / 2;
 
   const need = evaluate(needFrac), best = evaluate(bestFrac), none = evaluate(0);
+
+  /* Campbell's self-insurance rule. With a proportional markup L and relative
+     risk aversion gamma, the optimum leaves you still exposed to a fall of
+     about L/gamma; anything smaller than that is not worth insuring at all.
+     Here gamma = 1/eta over consumption, so the threshold is simply L*eta.
+     `residualDrop` is the same quantity read off the exact CRRA optimum, so
+     the two can be compared — the rule is the first-order approximation of
+     what this function solves exactly. */
+  const drop = (r) => r.able.CD0 > 0 ? (r.able.CD0 - r.hurt.CD0) / r.able.CD0 : 0;
+  const existing = Math.max(0, p.people[who].existingCover || 0);
+  const already = existing * fairRate * (1 + loading);
   return {
     probability: pTotal, meanAge, fairRate, loading, netAtFailure,
     need, best, none,
     needCover: need.cover, bestCover: best.cover,
     bestPremium: best.premium, needPremium: need.premium,
     uninsuredLoss: none.able.CD0 - none.hurt.CD0,
+    // What is left to do, given cover already in force.
+    existingCover: existing,
+    extraCover: Math.max(0, best.cover - existing),
+    extraPremium: Math.max(0, best.premium - already),
+    existingPremium: already,
+    overInsured: existing > best.cover * 1.1,
+    // Campbell's rule, and the exact answer it approximates.
+    uninsuredDrop: drop(none),
+    residualDrop: drop(best),
+    selfInsureThreshold: loading * p.eta,
+    worthInsuring: drop(none) > loading * p.eta,
   };
 }
 
@@ -1814,20 +1811,31 @@ en: {
   chSurvDesc: 'The chance of at least one of you still being here.',
   chSurvSingle: 'Your chance of still being here at each age.',
   bsTitle: 'Today’s balance sheet', bsDesc: 'Everything you own and owe, in economic terms.',
-  shockTitle: 'What if you could not work?',
-  shockDesc: 'Your earnings are the largest thing you own, and the one asset you cannot diversify. This is what happens if they stop.',
-  shockAgeLabel: 'Suppose your earnings stopped for good at age',
-  shockSpend: 'Spending if it happened', shockLoss: 'What you would lose, a year',
-  shockBenefit: 'Cover that would restore your plan', shockYears: 'Years it would need to pay',
-  shockNoteOk: 'That benefit is <b>{p}</b> of your gross salary. Insurers usually cap income protection at 50–70%, so cover at the top of the market would leave you about <b>{gap}</b> a year short — still far better than nothing.',
-  shockNoteBroken: 'Without cover this plan does not survive the shock at all: spending goes negative, meaning your essentials could not be met. The number above is what it would take to stay whole.',
+  annHelp: 'An annuity swaps a lump sum for an income that lasts exactly as long as you do. You are buying certainty about how long the money has to last, not a better return.',
+
+  cardIP: 'Income cover worth buying',
+  cardIPMore: 'Income cover still to buy',
+  cardIPNote: '{prem} a year',
+  cardIPNone: 'You already hold enough',
+
+  ipHave: 'Income insurance you already have',
+  ipHaveHelp: 'The yearly amount an existing policy would pay if you could not work — including any cover through your employer. Leave at zero if you have none.',
+  ipBuyMore: 'Worth buying on top of what you have',
+  ipPremiumExtra: 'What the extra cover would cost, a year',
+  ipSmallRule: 'The rule of thumb: at a margin of {load} and risk aversion of {rra}, do not insure any loss smaller than <b>{thr}</b> of your wealth — below that line the margin costs you more than the risk does, and you are better off carrying it yourself — that is the case against insuring a phone, an extended warranty, or a low motor excess. Losing your earnings would cost you <b>{loss}</b>, so {verdict}',
+  ipSmallYes: 'this one is on the right side of the line — worth insuring.',
+  ipSmallNo: 'this one falls below the line — self-insure it.',
+  ipSmallApprox: 'on that rule you could carry it yourself. The rule is built for small risks, though, and this one is not small: the exact calculation still finds {buy} a year worth buying.',
+  ipOver: 'You already hold {have} of cover, more than the {want} this plan calls for. Cover beyond what you would actually lose is money paid for a risk you are no longer carrying.',
   ipTitle: 'Insuring the biggest thing you own',
   ipDesc: 'Your earnings are your largest asset and the only one you cannot spread across a portfolio. This prices the risk that they stop.',
   ipOcc: 'What kind of work do you do?',
   ipOccOpts: ['Desk / professional', 'Mostly desk, some site work', 'Skilled manual', 'Heavy manual'],
   ipOccHelp: 'Insurers price four occupation classes, and the spread is wide: heavy manual work carries about two and a half times the claim rate of desk work.',
-  ipLoading: 'Insurer\u2019s margin over the fair price',
-  ipLoadingHelp: 'What you pay above the actuarially fair cost \u2014 the insurer\u2019s expenses and profit. This is the single thing that decides how much cover is worth buying: at a fair price, full cover is best for anyone at all risk-averse. Real policies typically load 40\u2013100%.',
+  ipLoading: 'Insurer’s margin over the fair price',
+  ipLoadingHelp: 'What you pay above the actuarially fair cost — the insurer’s expenses and profit. It is the single thing that decides how much cover is worth buying, and the one number you have no way to look up — so it is estimated from the work you do: <b>{est}</b> for your answer. {src}',
+  ipLoadingAuto: 'Currently using that estimate.',
+  ipLoadingManual: 'You have overridden the estimate.',
   ipProb: 'Chance it happens before you retire', ipNeed: 'Cover that makes you whole',
   ipBuy: 'Worth buying at this price', ipPremium: 'What that would cost you, a year',
   ipNote: 'At a fair price you would insure <b>fully</b>. At this margin the balance tips at <b>{share}</b> of full cover \u2014 beyond that the premium costs you more than the protection is worth.',
@@ -1836,8 +1844,6 @@ en: {
   ipExplain: '<p>Two futures are compared: one where you keep earning, and one where you lose the ability to earn at the age that is most likely on the published incidence rates. Cover replaces part of your net earnings from that point until your state pension starts, paid for by a premium while you are working.</p><p>The <b>cover that makes you whole</b> is the amount that leaves your sustainable spending the same either way. The <b>worth buying</b> figure is lower, because insurance is sold above its fair price: it is the point where one more pound of premium stops being worth the protection it buys.</p><p>Incidence comes from published data \u2014 the UK figures from the CMI\u2019s income-protection tables, the Czech from newly awarded third-degree invalidity pensions. Both imply the chance roughly doubles every eight to nine years of age.</p>',
   ipSourceUK: 'Incidence: CMI Working Paper 48 (IPM 1991\u201398, 52-week deferred period), scaled to current experience.',
   ipSourceCZ: 'V\u00fdskyt: nov\u011b p\u0159izn\u00e9 invalidn\u00ed d\u016fchody t\u0159et\u00edho stupn\u011b (\u010cSSZ 2024) na po\u010det osob v riziku.',
-  shockExplainT: 'How is the cover figure worked out?',
-  shockExplain: '<p>The model re-runs your whole plan with earnings stopping permanently at that age, keeping everything else the same. Your state pension is protected, because being unable to work earns you credits toward it.</p><p>It then searches for the level annual payment, running from that age to your state pension age, that would bring your sustainable spending back to where it is today. That figure is what your own balance sheet says you need — not a rule of thumb like &ldquo;60% of salary&rdquo;.</p><p>It is deliberately a <em>what-if</em>, not a forecast. It says nothing about how likely this is; it says what it would cost you.</p>',
 
   legTotal: 'Total spending, expected', legRange: 'Range of outcomes',
   legFloor: 'Essentials and mortgage', legFloorRent: 'Essential spending', legHC: 'Future earnings',
@@ -1984,13 +1990,31 @@ cs: {
   chSurvDesc: 'Pravděpodobnost, že alespoň jeden z vás bude naživu.',
   chSurvSingle: 'Pravděpodobnost, že se dožijete každého věku.',
   bsTitle: 'Dnešní bilance', bsDesc: 'Vše, co vlastníte a dlužíte, v ekonomickém smyslu.',
+  annHelp: 'Renta mění jednorázovou částku za příjem, který vydrží přesně tak dlouho jako vy. Kupujete si jistotu, jak dlouho musí peníze vydržet — ne vyšší výnos.',
+
+  cardIP: 'Pojištění příjmu k pořízení',
+  cardIPMore: 'Pojištění příjmu k dokoupení',
+  cardIPNote: '{prem} ročně',
+  cardIPNone: 'Už máte dost',
+
+  ipHave: 'Pojištění příjmu, které už máte',
+  ipHaveHelp: 'Roční částka, kterou by stávající pojistka vyplácela, kdybyste nemohli pracovat — včetně pojištění od zaměstnavatele. Pokud žádné nemáte, nechte nulu.',
+  ipBuyMore: 'Kolik se vyplatí dokoupit',
+  ipPremiumExtra: 'Co by to navíc stálo ročně',
+  ipSmallRule: 'Pravidlo palce: při marži {load} a averzi k riziku {rra} nepojišťujte žádnou ztrátu menší než <b>{thr}</b> vašeho majetku — pod touhle čarou stojí marže víc než samo riziko a vyplatí se ji unést sami — proto se nevyplatí pojistit telefon, prodlouženou záruku ani nízkou spoluúčast u auta. Ztráta výdělku by vás stála <b>{loss}</b>, takže {verdict}',
+  ipSmallYes: 'tahle je nad čarou — pojistit se vyplatí.',
+  ipSmallNo: 'tahle je pod čarou — unesete ji sami.',
+  ipSmallApprox: 'podle pravidla byste ji unesli sami. Pravidlo je ale stavěné na malá rizika a tohle malé není: přesný výpočet pořád nachází {buy} ročně, které se vyplatí koupit.',
+  ipOver: 'Už máte krytí {have}, tedy víc než {want}, které tento plán potřebuje. Krytí nad rámec toho, o co byste opravdu přišli, jsou peníze za riziko, které už nenesete.',
   ipTitle: 'Pojištění toho nejcennějšího, co máte',
   ipDesc: 'Vaše budoucí příjmy jsou vaše největší aktivum a jediné, které nejde rozložit do portfolia. Tady se oceňuje riziko, že skončí.',
   ipOcc: 'Jakou práci děláte?',
   ipOccOpts: ['Kancelář / odborná', 'Většinou kancelář, občas terén', 'Kvalifikovaná manuální', 'Těžká manuální'],
   ipOccHelp: 'Pojišťovny rozlišují čtyři rizikové skupiny a rozdíl je velký: těžká manuální práce má zhruba dva a půl krát vyšší škodnost než práce u stolu.',
   ipLoading: 'Marže pojišťovny nad férovou cenou',
-  ipLoadingHelp: 'Kolik platíte nad aktuársky férovou cenu — náklady a zisk pojišťovny. Právě tohle rozhoduje, kolik krytí se vyplácí koupit: za férovou cenu se plně pojistí i mírně opatrný člověk. Reálné produkty mají marži obvykle 40–100 %.',
+  ipLoadingHelp: 'Kolik platíte nad aktuársky férovou cenu — náklady a zisk pojišťovny. Právě tohle rozhoduje, kolik krytí se vyplácí koupit, a je to jediné číslo, které si nemáte kde zjistit — odhaduje se proto podle vaší práce: <b>{est}</b> pro vaši odpověď. {src}',
+  ipLoadingAuto: 'Teď se používá tento odhad.',
+  ipLoadingManual: 'Odhad jste přepsali ručně.',
   ipProb: 'Šance, že k tomu dojde před důchodem',
   ipNeed: 'Krytí, které vás dostane zpět',
   ipBuy: 'Kolik se při této ceně vyplácí',
@@ -2001,15 +2025,6 @@ cs: {
   ipExplain: '<p>Porovnávají se dvě budoucnosti: v jedné dál vyděláváte, ve druhé o schopnost vydělávat přijdete ve věku, který je podle publikovaných dat nejpravděpodobnější. Krytí nahradí část čistých příjmů až do starobního důchodu, za pojistné placené během práce.</p><p><b>Krytí, které vás dostane zpět</b> je částka, po níž jsou vaše udržitelné výdaje stejné tak i tak. Částka <b>kolik se vyplácí</b> je nižší, protože pojištění se prodává nad férovou cenou.</p><p>Výskyt vychází z publikovaných dat — česká z nově přiznaných invalidních důchodů třetího stupně (ČSSZ 2024), britská z tabulek CMI. Obojí ukazuje, že riziko se zhruba zdvojnásobí každých osm až devět let věku.</p>',
   ipSourceUK: '',
   ipSourceCZ: 'Výskyt: nově přiznané invalidní důchody třetího stupně (ČSSZ 2024) na počet osob v riziku. Populační míra, tedy horní odhad pro zdravotně upsaného klienta.',
-  shockTitle: 'Co když nebudete moci pracovat?',
-  shockDesc: 'Vaše budoucí příjmy jsou to největší, co máte — a jediné aktivum, které nejde rozložit. Tohle se stane, když skončí.',
-  shockAgeLabel: 'Dejme tomu, že by váš příjem natrvalo skončil ve věku',
-  shockSpend: 'Výdaje, kdyby k tomu došlo', shockLoss: 'Kolik byste ročně ztratili',
-  shockBenefit: 'Pojistné plnění, které plán zachrání', shockYears: 'Kolik let by muselo platit',
-  shockNoteOk: 'To je <b>{p}</b> vaší hrubé mzdy. Pojišťovny obvykle kryjí 50–70 %, takže i nejvyšší dostupné krytí by nechalo asi <b>{gap}</b> ročně nepokrytých — pořád mnohem lepší než nic.',
-  shockNoteBroken: 'Bez pojištění tenhle plán takový výpadek nepřežije: výdaje jdou do minusu, tedy ani nezbytné výdaje by nebyly pokryté. Číslo výše je to, co by bylo potřeba.',
-  shockExplainT: 'Jak se to číslo počítá?',
-  shockExplain: '<p>Model přepočítá celý váš plán s tím, že příjem v daném věku natrvalo skončí, a všechno ostatní nechá stejné. Starobní důchod zůstává, protože doba invalidity se do pojištění započítává.</p><p>Pak hledá takovou roční částku vyplácenou od toho věku do důchodového věku, která vrátí vaše udržitelné výdaje tam, kde jsou dnes. To je částka, kterou říká vaše vlastní bilance — ne poučka typu „60 % mzdy“.</p><p>Je to záměrně <em>co kdyby</em>, ne předpověď. Neříká, jak je to pravděpodobné; říká, kolik by to stálo.</p>',
 
   legTotal: 'Celkové výdaje, očekávané', legRange: 'Rozpětí možných výsledků',
   legFloor: 'Nezbytné výdaje a hypotéka', legFloorRent: 'Nezbytné výdaje', legHC: 'Budoucí příjmy',
@@ -2072,12 +2087,19 @@ function freshState() {
     alpha: 0.4,
     beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
-    rf: C.rf, maxAge: 105, shockAge: 45,
-    occClass: 0, loading: 0.5,
+    rf: C.rf, maxAge: 105,
+    occClass: 0,
+    existingCover: 0,
+    /* The insurer's margin is the one number that decides how much cover is
+       worth buying and the one number a normal person cannot know. It is
+       estimated from the occupation answer; null means "use the estimate". */
+    loadingOverride: null,
   };
 }
 let S = freshState();
 let touched = false, lastR = null;
+const effLoading = () =>
+  S.loadingOverride != null ? S.loadingOverride : marketLoading(BUILD.country, S.occClass);
 
 /* ----------------------------------------------------------------- format */
 const nf0 = new Intl.NumberFormat(C.locale, { style:'currency', currency:C.currency, maximumFractionDigits:0 });
@@ -2127,6 +2149,9 @@ function buildParams() {
     statutoryPensionAge: Math.round(C.pensionAgeFor(CY - p.age)),
     employerPensionRate: p.employerPensionRate,
     occClass: S.occClass,
+    // Cover already in force belongs to the first earner, who is the one the
+    // insurance panel sizes cover for.
+    existingCover: p === S.people[0] ? Math.max(0, S.existingCover || 0) : 0,
     birthYear: CY - p.age,
   }));
   const theta = thetaFromAnswer();
@@ -2401,7 +2426,7 @@ function buildRail() {
     el('div', { class:'readout', id:'shape-out' }),
     seg(T.qSmooth, T.qSmoothOpts, ()=>S.smooth, v=>S.smooth=v, T.qSmoothHelp, true),
     slider(T.qAnnuity, ()=>S.alpha*100, v=>S.alpha=v/100, 0, 100, 5, v=>v.toFixed(0)+'%',
-           T.annNone, T.annAll, ()=>T.annReadout),
+           T.annNone, T.annAll, ()=>T.annHelp),
     el('div', { class:'readout', id:'ann-out' }),
     seg(T.qBequest, T.beqOpts, ()=>({none:0,fixed:1,opt:2})[S.beqMode],
         v=>S.beqMode=['none','fixed','opt'][v], T.beqHelp, true),
@@ -2424,6 +2449,16 @@ function buildRail() {
       fieldNum(T.rf, ()=>Math.round(S.rf*1000)/10, v=>S.rf=v/100, -2, 8, 0.1, '%'),
       fieldNum(T.horizon, ()=>S.maxAge, v=>S.maxAge=Math.max(70,Math.min(115,v)), 70, 115, 1),
     ]),
+    /* The insurer's margin lives here rather than in the insurance panel: it
+       decides the answer, but asking a normal person for it produces a guess
+       dressed as an input. Estimated by occupation, visible and overridable. */
+    slider(T.ipLoading, () => Math.round(effLoading() * 100),
+           v => { S.loadingOverride = v / 100; }, 0, 150, 5, v => v.toFixed(0) + '%',
+           '0%', '150%',
+           () => fill(T.ipLoadingHelp, {
+             est: pct(marketLoading(BUILD.country, S.occClass)),
+             src: S.loadingOverride == null ? T.ipLoadingAuto : T.ipLoadingManual,
+           })),
   ], false));
 }
 
@@ -2637,13 +2672,18 @@ function drawHeadline(R) {
          : (y0.equityShareUncon > 1.05 ? `${T.legIdeal}: ${pct(y0.equityShareUncon)}` : '') },
     { k:T.cardPension, v:moneyK(R._pension), accent:'var(--amber)',
       n:`${C.code} · ${C.taxYear}` },
+    /* Filled in by paintIPCard when the insurance solve lands — it is far too
+       slow to run inside the headline redraw. */
+    { k:T.cardIP, v:'—', accent:'var(--brick)', n:'', ip:true },
   ];
   if (S.beqMode !== 'none') cards.push(
     { k:T.cardBequest, v:moneyK(R.beq), accent:'var(--violet)', n:'' });
 
   document.getElementById('headline').innerHTML = cards.map((c,i) =>
     `<div class="stat${c.hero?' hero':''}" style="--accent:${c.accent}">
-       <div class="k">${c.k}</div><div class="v">${c.v}</div>
+       <div class="k"${c.ip?' id="ip-headline-k"':''}>${c.k}</div>
+       <div class="v"${c.ip?' id="ip-headline-v"':''}>${c.v}</div>
+       ${c.ip?'<div class="n" id="ip-headline-n"></div>':''}
        ${c.n?`<div class="n">${c.n}</div>`:''}
        ${c.why?`<button class="why noprint" id="whybtn">${T.explain}</button>
                 <div class="derivation" id="deriv" hidden>${derivationHTML(R)}</div>`:''}
@@ -2676,42 +2716,9 @@ function drawAlerts(R) {
   document.getElementById('alerts').innerHTML =
     A.map(a=>`<div class="alert ${a.t}"><div><b>${a.h}</b> ${a.b}</div></div>`).join('');
 }
-/* Proposal B: what a permanent loss of earnings would cost, and the cover that
-   would undo it. Deterministic on purpose — it does not claim to know the odds,
-   only the consequence. */
-function drawShock() {
-  const box = document.getElementById('shock-cards');
-  const note = document.getElementById('shock-note');
-  if (!box) return;
-  const p = buildParams();
-  const person = p.people[0];
-  const stop = Math.max(person.age + 1, Math.min(person.pensionAge - 1, S.shockAge));
-  let r;
-  try { r = incomeShock(p, ctx, stop, 0); }
-  catch (e) { box.innerHTML = ''; note.textContent = ''; return; }
-
-  const cards = [
-    { k:T.shockSpend, v:money(r.noCover.CD0), accent:'var(--brick)' },
-    { k:T.shockLoss, v:money(Math.max(0, r.lossPerYear)), accent:'var(--brick)' },
-    { k:T.shockBenefit, v:money(r.benefit), accent:'var(--teal)' },
-    { k:T.shockYears, v:String(Math.max(0, person.pensionAge - stop)), accent:'var(--slate)' },
-  ];
-  box.innerHTML = cards.map(c =>
-    `<div class="stat" style="--accent:${c.accent}">
-       <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
-
-  const gross = p.people.reduce((s, x) => s + Math.max(0, x.salary), 0);
-  const share = gross > 0 ? r.benefit / gross : 0;
-  const marketMax = 0.70;
-  note.innerHTML = r.noCover.CD0 <= 0
-    ? T.shockNoteBroken
-    : fill(T.shockNoteOk, { p: pct(share),
-        gap: money(Math.max(0, r.benefit - gross * marketMax)) });
-}
-
-/* Proposal C: income protection priced from published incidence, sized from the
-   household's own balance sheet. Slow enough (~0.5s) to run on demand rather
-   than on every keystroke. */
+/* Income protection priced from published incidence, sized from the household's
+   own balance sheet. Slow enough (~0.5s) to run on demand rather than on every
+   keystroke, so the headline card it feeds is painted separately when it lands. */
 let ipTimer = null, ipLast = null;
 function drawInsurance(force) {
   const cards = document.getElementById('ip-cards');
@@ -2720,25 +2727,63 @@ function drawInsurance(force) {
   clearTimeout(ipTimer);
   ipTimer = setTimeout(() => {
     let r;
-    try { r = insuranceAnalysis(buildParams(), ctx, { loading: S.loading }); }
+    try { r = insuranceAnalysis(buildParams(), ctx, { loading: effLoading() }); }
     catch (e) { r = null; }
-    if (!r) { cards.innerHTML = ''; note.textContent = ''; return; }
+    if (!r) { cards.innerHTML = ''; note.textContent = ''; ipLast = null; paintIPCard(); return; }
     ipLast = r;
+    paintIPCard();
     const shareOfFull = r.needCover > 0 ? r.bestCover / r.needCover : 0;
     const list = [
       { k: T.ipProb, v: pct(r.probability, 1), accent: 'var(--brick)' },
       { k: T.ipNeed, v: money(r.needCover), accent: 'var(--slate)' },
-      { k: T.ipBuy, v: money(r.bestCover), accent: 'var(--teal)' },
-      { k: T.ipPremium, v: money(r.bestPremium), accent: 'var(--amber)' },
+      { k: S.existingCover > 0 ? T.ipBuyMore : T.ipBuy,
+        v: money(r.extraCover), accent: 'var(--teal)' },
+      { k: S.existingCover > 0 ? T.ipPremiumExtra : T.ipPremium,
+        v: money(r.extraPremium), accent: 'var(--amber)' },
     ];
     cards.innerHTML = list.map(c =>
       `<div class="stat" style="--accent:${c.accent}">
          <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
-    note.innerHTML = fill(T.ipNote, { share: pct(shareOfFull) }) +
-      '<br><span style="opacity:.85">' + T.ipNoteMossin + '</span>';
+
+    /* Campbell's rule: with a markup L and risk aversion gamma, stop insuring
+       once the remaining exposure is L/gamma of your wealth — and do not insure
+       at all anything smaller than that. Shown alongside what this household's
+       loss actually is, because the point only lands with both numbers.
+
+       The rule is a small-risk approximation and losing your earnings is not a
+       small risk, so on extreme settings it declines something the exact solve
+       still buys. Where they part company the copy says so rather than stating
+       the rule's verdict as if it were the answer above it. */
+    const verdict = r.worthInsuring ? T.ipSmallYes
+      : (r.bestCover > r.needCover * 0.15 ? T.ipSmallApprox : T.ipSmallNo);
+    const parts = [fill(T.ipNote, { share: pct(shareOfFull) })];
+    parts.push('<br><span style="opacity:.85">' + fill(T.ipSmallRule, {
+      load: pct(r.loading), rra: (1 / buildParams().eta).toFixed(0),
+      thr: pct(r.selfInsureThreshold),
+      loss: pct(r.uninsuredDrop),
+      verdict: fill(verdict, { buy: money(r.bestCover) }),
+    }) + '</span>');
+    if (r.overInsured) parts.push('<br><b>' + fill(T.ipOver, {
+      have: money(r.existingCover), want: money(r.bestCover) }) + '</b>');
+    note.innerHTML = parts.join('');
     const src = document.getElementById('ip-source');
     if (src) src.textContent = BUILD.country === 'CZ' ? T.ipSourceCZ : T.ipSourceUK;
   }, force ? 0 : 350);
+}
+
+/* The headline card is painted whenever the (slow) analysis lands, and left
+   showing its previous value in between rather than flickering to a dash. */
+function paintIPCard() {
+  const v = document.getElementById('ip-headline-v');
+  const k = document.getElementById('ip-headline-k');
+  const n = document.getElementById('ip-headline-n');
+  if (!v) return;
+  if (!ipLast) { v.textContent = '—'; if (n) n.textContent = ''; return; }
+  v.textContent = moneyK(ipLast.extraCover);
+  if (k) k.textContent = S.existingCover > 0 ? T.cardIPMore : T.cardIP;
+  if (n) n.textContent = ipLast.extraCover <= 0
+    ? T.cardIPNone
+    : fill(T.cardIPNote, { prem: money(ipLast.extraPremium) });
 }
 
 function buildInsuranceControls() {
@@ -2747,9 +2792,8 @@ function buildInsuranceControls() {
   box.innerHTML = '';
   box.appendChild(seg(T.ipOcc, T.ipOccOpts, () => S.occClass,
                       v => { S.occClass = v; render(); }, T.ipOccHelp, true));
-  box.appendChild(slider(T.ipLoading, () => Math.round(S.loading * 100),
-    v => { S.loading = v / 100; render(); }, 0, 150, 5, v => v.toFixed(0) + '%',
-    '0%', '150%', () => T.ipLoadingHelp));
+  box.appendChild(fieldMoney(T.ipHave, () => S.existingCover,
+                             v => S.existingCover = Math.max(0, v), T.ipHaveHelp));
 }
 
 function drawBalanceSheet(R) {
@@ -2790,8 +2834,8 @@ function render() {
   R._pension = p.people.reduce((s,person)=>s + ctx.statePension(person, null), 0);
 
   lastR = R;
-  drawHeadline(R); drawAlerts(R);
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawShock(); drawInsurance();
+  drawHeadline(R); drawAlerts(R); paintIPCard();
+  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawInsurance();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
@@ -2864,7 +2908,9 @@ function writeURL() {
   put('dz',S.downsize?1:0,0); put('da',S.downsizeAge,D.downsizeAge); put('dr',S.downsizeRelease,D.downsizeRelease);
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
-  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge); put('sa',S.shockAge,D.shockAge); put('oc',S.occClass,D.occClass); put('ld',S.loading,D.loading);
+  put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  put('oc',S.occClass,D.occClass); put('ic',S.existingCover,D.existingCover);
+  if (S.loadingOverride != null) q.set('ld', String(S.loadingOverride));
   const s = q.toString();
   history.replaceState(null,'', s ? '?'+s : location.pathname);
 }
@@ -2890,7 +2936,8 @@ function readURL() {
   num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
   num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
   num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
-  num('sa',v=>S.shockAge=v); num('oc',v=>S.occClass=v); num('ld',v=>S.loading=v);
+  num('oc',v=>S.occClass=v); num('ic',v=>S.existingCover=v);
+  num('ld',v=>S.loadingOverride=v);
   if (q.has('bq')) S.beqMode=q.get('bq');
   num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
 }
@@ -2910,11 +2957,6 @@ function setText() {
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
   set('t-ipTitle', T.ipTitle); set('t-ipDesc', T.ipDesc);
   set('t-ipExplainT', T.ipExplainT); set('ipExplain', T.ipExplain, true);
-  set('t-shockTitle', T.shockTitle); set('t-shockDesc', T.shockDesc);
-  set('t-shockAgeLabel', T.shockAgeLabel);
-  set('t-shockExplainT', T.shockExplainT); set('shockExplain', T.shockExplain, true);
-  const sa = document.getElementById('shockAge');
-  if (sa && document.activeElement !== sa) sa.value = S.shockAge;
   set('t-assets', T.assets); set('t-liabs', T.liabsNW);
   set('t-explain1', T.explain);
   set('explain1', BUILD.lang === 'cs'
@@ -2994,14 +3036,6 @@ function init() {
   window.addEventListener('beforeprint', fillPrintHeader);
   fillPrintHeader();
   buildInsuranceControls();
-  const sa = document.getElementById('shockAge');
-  if (sa) {
-    sa.value = S.shockAge;
-    sa.addEventListener('input', () => {
-      const v = parseFloat(sa.value);
-      if (Number.isFinite(v)) { S.shockAge = Math.round(Math.max(20, Math.min(80, v))); render(); }
-    });
-  }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
   window.addEventListener('resize', () => { clearTimeout(window._rz); window._rz = setTimeout(render, 150); });
 
