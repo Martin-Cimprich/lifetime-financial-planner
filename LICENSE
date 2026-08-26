@@ -1,0 +1,63 @@
+Lifetime Financial Planner
+Copyright (c) 2026 Martin Cimprich
+
+NON-COMMERCIAL USE ONLY
+
+This work is a derivative of the "IK Excel Lifecycle Model", (c) 2026 Paul D.
+Kaplan, whose source carries the notice "For non-commercial use only". That
+restriction is inherited and cannot be waived by the author of this derivative,
+who holds no rights in the underlying work.
+
+GRANT
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and its associated documentation files (the "Software"), to use,
+copy, modify, merge, publish and distribute the Software, subject to the
+following conditions:
+
+1. NON-COMMERCIAL. The Software may not be used for a commercial purpose. A
+   commercial purpose is any use that is primarily intended for or directed
+   toward commercial advantage or monetary compensation. This includes, without
+   limitation, use in the provision of financial advice or financial services,
+   use in marketing or client acquisition, and incorporation into any product or
+   service that is sold, licensed or otherwise monetised. Personal use,
+   education, teaching, academic research and journalism are not commercial
+   purposes.
+
+   Anyone wishing to use this Software commercially must obtain permission from
+   Paul D. Kaplan, as the rights holder in the underlying work, in addition to
+   the author of this derivative.
+
+2. ATTRIBUTION AND NOTICES. The above copyright notice, this permission notice,
+   and the file NOTICE.md must be included in all copies or substantial portions
+   of the Software. NOTICE.md records the origin of the model, the source of
+   every piece of country data, the deviations from the reference implementation,
+   and the disclaimers below; it is part of the licence terms.
+
+3. NOT ADVICE. The Software is an educational tool. It is not financial,
+   investment, tax or legal advice, and it is not a regulated activity. Any
+   distribution of the Software, modified or unmodified, must preserve the
+   disclaimers it displays to the user.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+There is no guarantee of the accuracy of the calculations. Nobody should make a
+financial decision on the basis of this Software without consulting a suitably
+qualified and regulated adviser.
+
+THIRD-PARTY MATERIAL
+
+The Idzorek-Kaplan monograph, the original Excel workbook and its user manual are
+not distributed with this Software and are not covered by this licence. Country
+data is transcribed from official public sources, listed in NOTICE.md; UK figures
+derived from Office for National Statistics material are used under the Open
+Government Licence v3.0.
+
+CFA(R) and Chartered Financial Analyst(R) are trademarks owned by CFA Institute.

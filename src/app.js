@@ -12,9 +12,11 @@ function freshState() {
     couple: false,
     people: [
       { age: 35, sex: 1, health: 1, trajectory: 1, jobRisk: 1, salary: D.salary,
-        workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate },
+        workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate,
+        occClass: 0, existingCover: 0 },
       { age: 35, sex: 2, health: 1, trajectory: 1, jobRisk: 1, salary: Math.round(D.salary * 0.85),
-        workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate },
+        workUntilAge: pAge, pensionAge: pAge, employerPensionRate: D.employerPensionRate,
+        occClass: 0, existingCover: 0 },
     ],
     cbar: D.cbar,
     savings: { ...D.savings },
@@ -28,18 +30,22 @@ function freshState() {
     beqMode: 'none', beqFixed: Math.round(D.salary * 5), beqWeight: 1,
     fee: C.defaultFee,
     rf: C.rf, maxAge: 105,
-    occClass: 0,
-    existingCover: 0,
     /* The insurer's margin is the one number that decides how much cover is
        worth buying and the one number a normal person cannot know. It is
-       estimated from the occupation answer; null means "use the estimate". */
+       estimated from each person's occupation answer; null means "use the
+       estimate". An override applies to the whole household, because it is a
+       fact about the market rather than about a person. */
     loadingOverride: null,
   };
 }
 let S = freshState();
 let touched = false, lastR = null;
-const effLoading = () =>
-  S.loadingOverride != null ? S.loadingOverride : marketLoading(BUILD.country, S.occClass);
+/* Cleared if the document is not allowed to rewrite its own URL, which also
+   means the share link cannot carry the scenario. */
+let urlWritable = true;
+const effLoading = (i = 0) => S.loadingOverride != null
+  ? S.loadingOverride
+  : marketLoading(BUILD.country, S.people[i]?.occClass ?? 0);
 
 /* ----------------------------------------------------------------- format */
 const nf0 = new Intl.NumberFormat(C.locale, { style:'currency', currency:C.currency, maximumFractionDigits:0 });
@@ -88,10 +94,10 @@ function buildParams() {
     // statutory age on the SAME rounding basis the interface shows.
     statutoryPensionAge: Math.round(C.pensionAgeFor(CY - p.age)),
     employerPensionRate: p.employerPensionRate,
-    occClass: S.occClass,
-    // Cover already in force belongs to the first earner, who is the one the
-    // insurance panel sizes cover for.
-    existingCover: p === S.people[0] ? Math.max(0, S.existingCover || 0) : 0,
+    // Each earner carries their own occupation class and their own cover: the
+    // hazard, the price and the gap left to buy are all personal.
+    occClass: p.occClass ?? 0,
+    existingCover: Math.max(0, p.existingCover || 0),
     birthYear: CY - p.age,
   }));
   const theta = thetaFromAnswer();
@@ -392,11 +398,13 @@ function buildRail() {
     /* The insurer's margin lives here rather than in the insurance panel: it
        decides the answer, but asking a normal person for it produces a guess
        dressed as an input. Estimated by occupation, visible and overridable. */
-    slider(T.ipLoading, () => Math.round(effLoading() * 100),
+    slider(T.ipLoading, () => Math.round(effLoading(0) * 100),
            v => { S.loadingOverride = v / 100; }, 0, 150, 5, v => v.toFixed(0) + '%',
            '0%', '150%',
            () => fill(T.ipLoadingHelp, {
-             est: pct(marketLoading(BUILD.country, S.occClass)),
+             est: (S.couple ? S.people : [S.people[0]])
+                    .map((p, i) => `${pct(marketLoading(BUILD.country, p.occClass ?? 0))} ` +
+                                  `(${i === 0 ? T.s2 : T.s2b})`).join(', '),
              src: S.loadingOverride == null ? T.ipLoadingAuto : T.ipLoadingManual,
            })),
   ], false));
@@ -660,55 +668,70 @@ function drawAlerts(R) {
    own balance sheet. Slow enough (~0.5s) to run on demand rather than on every
    keystroke, so the headline card it feeds is painted separately when it lands. */
 let ipTimer = null, ipLast = null;
+/* One analysis per earner. Each is priced on their own occupation, their own
+   hazard and the cover they already hold; the headline card carries the
+   household total, because that is the cheque the household writes. Two solves
+   for a couple, so it stays debounced and out of the keystroke path. */
 function drawInsurance(force) {
-  const cards = document.getElementById('ip-cards');
-  const note = document.getElementById('ip-note');
-  if (!cards) return;
+  const box = document.getElementById('ip-results');
+  if (!box) return;
   clearTimeout(ipTimer);
   ipTimer = setTimeout(() => {
-    let r;
-    try { r = insuranceAnalysis(buildParams(), ctx, { loading: effLoading() }); }
-    catch (e) { r = null; }
-    if (!r) { cards.innerHTML = ''; note.textContent = ''; ipLast = null; paintIPCard(); return; }
-    ipLast = r;
+    const p = buildParams();
+    const rs = p.people.map((_, i) => {
+      try { return insuranceAnalysis(p, ctx, { who: i, loading: effLoading(i) }); }
+      catch (e) { return null; }
+    });
+    if (!rs.some(Boolean)) { box.innerHTML = ''; ipLast = null; paintIPCard(); return; }
+    ipLast = rs;
     paintIPCard();
-    const shareOfFull = r.needCover > 0 ? r.bestCover / r.needCover : 0;
-    const list = [
-      { k: T.ipProb, v: pct(r.probability, 1), accent: 'var(--brick)' },
-      { k: T.ipNeed, v: money(r.needCover), accent: 'var(--slate)' },
-      { k: S.existingCover > 0 ? T.ipBuyMore : T.ipBuy,
-        v: money(r.extraCover), accent: 'var(--teal)' },
-      { k: S.existingCover > 0 ? T.ipPremiumExtra : T.ipPremium,
-        v: money(r.extraPremium), accent: 'var(--amber)' },
-    ];
-    cards.innerHTML = list.map(c =>
-      `<div class="stat" style="--accent:${c.accent}">
-         <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
-
-    /* Campbell's rule: with a markup L and risk aversion gamma, stop insuring
-       once the remaining exposure is L/gamma of your wealth — and do not insure
-       at all anything smaller than that. Shown alongside what this household's
-       loss actually is, because the point only lands with both numbers.
-
-       The rule is a small-risk approximation and losing your earnings is not a
-       small risk, so on extreme settings it declines something the exact solve
-       still buys. Where they part company the copy says so rather than stating
-       the rule's verdict as if it were the answer above it. */
-    const verdict = r.worthInsuring ? T.ipSmallYes
-      : (r.bestCover > r.needCover * 0.15 ? T.ipSmallApprox : T.ipSmallNo);
-    const parts = [fill(T.ipNote, { share: pct(shareOfFull) })];
-    parts.push('<br><span style="opacity:.85">' + fill(T.ipSmallRule, {
-      load: pct(r.loading), rra: (1 / buildParams().eta).toFixed(0),
-      thr: pct(r.selfInsureThreshold),
-      loss: pct(r.uninsuredDrop),
-      verdict: fill(verdict, { buy: money(r.bestCover) }),
-    }) + '</span>');
-    if (r.overInsured) parts.push('<br><b>' + fill(T.ipOver, {
-      have: money(r.existingCover), want: money(r.bestCover) }) + '</b>');
-    note.innerHTML = parts.join('');
+    box.innerHTML = rs.map((r, i) => r ? ipSectionHTML(r, i, rs.length > 1) : '').join('');
     const src = document.getElementById('ip-source');
     if (src) src.textContent = BUILD.country === 'CZ' ? T.ipSourceCZ : T.ipSourceUK;
   }, force ? 0 : 350);
+}
+
+/** The four stat cards and the explanatory note for one earner. */
+function ipSectionHTML(r, i, named) {
+  const held = r.existingCover > 0;
+  const nothing = r.bestCover <= 0;
+  const shareOfFull = r.needCover > 0 ? r.bestCover / r.needCover : 0;
+  const list = [
+    { k: named ? T.ipProbN : T.ipProb, v: pct(r.probability, 1), accent: 'var(--brick)' },
+    { k: named ? T.ipNeedN : T.ipNeed, v: money(r.needCover), accent: 'var(--slate)' },
+    { k: held ? T.ipBuyMore : T.ipBuy,
+      v: nothing ? T.cardIPNothingV : money(r.extraCover), accent: 'var(--teal)' },
+    { k: held ? T.ipPremiumExtra : (named ? T.ipPremiumN : T.ipPremium),
+      v: nothing ? T.cardIPNothingV : money(r.extraPremium), accent: 'var(--amber)' },
+  ];
+  const cards = list.map(c =>
+    `<div class="stat" style="--accent:${c.accent}">
+       <div class="k">${c.k}</div><div class="v">${c.v}</div></div>`).join('');
+
+  /* Campbell's rule: with a markup L and risk aversion gamma, stop insuring
+     once the remaining exposure is L/gamma of your wealth — and do not insure
+     at all anything smaller than that. Shown alongside what this person's loss
+     actually is, because the point only lands with both numbers.
+
+     The rule is a small-risk approximation and losing your earnings is not a
+     small risk, so on extreme settings it declines something the exact solve
+     still buys. Where they part company the copy says so rather than stating
+     the rule's verdict as if it were the answer above it. */
+  const verdict = r.worthInsuring ? T.ipSmallYes
+    : (r.bestCover > r.needCover * 0.15 ? T.ipSmallApprox : T.ipSmallNo);
+  const parts = [nothing ? T.ipNoteNone : fill(T.ipNote, { share: pct(shareOfFull) })];
+  parts.push('<br><span style="opacity:.85">' + fill(named ? T.ipSmallRuleN : T.ipSmallRule, {
+    load: pct(r.loading), rra: (1 / buildParams().eta).toFixed(0),
+    thr: pct(r.selfInsureThreshold),
+    loss: pct(r.uninsuredDrop),
+    verdict: fill(verdict, { buy: money(r.bestCover) }),
+  }) + '</span>');
+  if (r.overInsured) parts.push('<br><b>' + fill(named ? T.ipOverN : T.ipOver, {
+    have: money(r.existingCover), want: money(r.bestCover) }) + '</b>');
+
+  return (named ? `<div class="eyebrow" style="margin:4px 0 7px">${i === 0 ? T.s2 : T.s2b}</div>` : '')
+    + `<div class="headline" style="margin-bottom:12px">${cards}</div>`
+    + `<div class="note" style="margin-bottom:18px">${parts.join('')}</div>`;
 }
 
 /* The headline card is painted whenever the (slow) analysis lands, and left
@@ -718,22 +741,59 @@ function paintIPCard() {
   const k = document.getElementById('ip-headline-k');
   const n = document.getElementById('ip-headline-n');
   if (!v) return;
-  if (!ipLast) { v.textContent = '—'; if (n) n.textContent = ''; return; }
-  v.textContent = moneyK(ipLast.extraCover);
-  if (k) k.textContent = S.existingCover > 0 ? T.cardIPMore : T.cardIP;
-  if (n) n.textContent = ipLast.extraCover <= 0
+  if (!ipLast || !ipLast.length) { v.textContent = '—'; if (n) n.textContent = ''; return; }
+  const rs = ipLast.filter(Boolean);
+  const extraCover = rs.reduce((a, r) => a + r.extraCover, 0);
+  const extraPrem  = rs.reduce((a, r) => a + r.extraPremium, 0);
+  const anyWorth   = rs.some(r => r.bestCover > 0);
+  const anyHeld    = rs.some(r => r.existingCover > 0);
+  /* Two zeros that mean opposite things: at this margin no cover is worth
+     buying at all, versus you already hold what the plan calls for. Printing a
+     money figure for the first read as a recommendation to buy a token amount,
+     directly above prose telling the reader to carry the risk themselves. */
+  if (!anyWorth) {
+    if (k) k.textContent = T.cardIP;
+    v.textContent = T.cardIPNothingV;
+    if (n) n.textContent = T.cardIPNothing;
+    return;
+  }
+  v.textContent = moneyK(extraCover);
+  if (k) k.textContent = anyHeld ? T.cardIPMore : T.cardIP;
+  if (n) n.textContent = extraCover <= 0
     ? T.cardIPNone
-    : fill(T.cardIPNote, { prem: money(ipLast.extraPremium) });
+    : fill(T.cardIPNote, { prem: money(extraPrem) });
 }
 
+/* One occupation answer and one cover figure per earner. Sharing them across a
+   couple meant a doctor married to a builder got a single occupation class. */
 function buildInsuranceControls() {
   const box = document.getElementById('ip-controls');
   if (!box) return;
   box.innerHTML = '';
-  box.appendChild(seg(T.ipOcc, T.ipOccOpts, () => S.occClass,
-                      v => { S.occClass = v; render(); }, T.ipOccHelp, true));
-  box.appendChild(fieldMoney(T.ipHave, () => S.existingCover,
-                             v => S.existingCover = Math.max(0, v), T.ipHaveHelp));
+  const people = S.couple ? S.people : [S.people[0]];
+  const blockFor = (p, i) => {
+    const kids = [
+      seg(T.ipOccN, T.ipOccOpts, () => p.occClass ?? 0,
+          v => { p.occClass = v; render(); }, T.ipOccHelp, true),
+      fieldMoney(T.ipHaveN, () => p.existingCover ?? 0,
+                 v => p.existingCover = Math.max(0, v), T.ipHaveHelpN),
+    ];
+    return S.couple
+      ? el('div', { class:'person' }, [el('h4', { text: i === 0 ? T.s2 : T.s2b }), ...kids])
+      : el('div', {}, kids);
+  };
+  if (S.couple) {
+    box.className = 'row2';
+    box.style.maxWidth = '';
+    people.forEach((p, i) => box.appendChild(blockFor(p, i)));
+  } else {
+    box.className = 'row2';
+    box.style.maxWidth = '640px';
+    box.appendChild(seg(T.ipOcc, T.ipOccOpts, () => S.people[0].occClass ?? 0,
+                        v => { S.people[0].occClass = v; render(); }, T.ipOccHelp, true));
+    box.appendChild(fieldMoney(T.ipHave, () => S.people[0].existingCover ?? 0,
+                               v => S.people[0].existingCover = Math.max(0, v), T.ipHaveHelp));
+  }
 }
 
 function drawBalanceSheet(R) {
@@ -839,6 +899,7 @@ function writeURL() {
     put(`k${i}`,p.jobRisk,d.jobRisk);
     put(`w${i}`,p.workUntilAge,d.workUntilAge); put(`p${i}`,p.pensionAge,d.pensionAge);
     put(`e${i}`,p.employerPensionRate,d.employerPensionRate);
+    put(`oc${i}`,p.occClass,d.occClass); put(`ic${i}`,p.existingCover,d.existingCover);
   });
   put('cb',S.cbar,D.cbar);
   put('vs',S.savings.shares,D.savings.shares); put('vb',S.savings.bonds,D.savings.bonds);
@@ -849,37 +910,67 @@ function writeURL() {
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
   put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
-  put('oc',S.occClass,D.occClass); put('ic',S.existingCover,D.existingCover);
   if (S.loadingOverride != null) q.set('ld', String(S.loadingOverride));
   const s = q.toString();
-  history.replaceState(null,'', s ? '?'+s : location.pathname);
+  /* An origin-less document — a sandboxed iframe, a data: URL, some local
+     viewers — forbids replaceState outright. This is the last thing render()
+     does, so the throw left the page drawn but every recalculation raising an
+     uncaught error, and the share button copying a link with no scenario in it.
+     Fail quietly: the scenario is still on screen, only the link is lost. */
+  try { history.replaceState(null,'', s ? '?'+s : location.pathname); }
+  catch (e) { urlWritable = false; }
 }
+/* A link is the one route into the model that does not pass through an input
+   field, so every bound the fields enforce has to be enforced again here. The
+   ranges below mirror buildRail(). Without them a hand-edited or stale link
+   could put an employer contribution of -500000% into the model, which is the
+   same class of defect the fields themselves were hardened against. */
 function readURL() {
   const q = new URLSearchParams(location.search);
   if (![...q.keys()].length) return;
   touched = true;
-  const num = (k,f)=>{ if(q.has(k)){ const v=parseFloat(q.get(k)); if(Number.isFinite(v)) f(v); } };
-  num('c',v=>S.couple=!!v);
+  const num = (k,f,lo,hi,whole)=>{
+    if (!q.has(k)) return;
+    let v = parseFloat(q.get(k));
+    if (!Number.isFinite(v)) return;
+    v = Math.max(lo, Math.min(hi, v));
+    if (whole) v = Math.round(v);
+    f(v);
+  };
+  const CASH = 1e12;
+  num('c',v=>S.couple=!!v,0,1,true);
   for (let i=0;i<2;i++){
     const p=S.people[i];
-    num(`a${i}`,v=>p.age=v); num(`s${i}`,v=>p.sex=v); num(`h${i}`,v=>p.health=v);
-    num(`j${i}`,v=>p.trajectory=v); num(`y${i}`,v=>p.salary=v);
-    num(`k${i}`,v=>p.jobRisk=v);
-    num(`w${i}`,v=>p.workUntilAge=v); num(`p${i}`,v=>p.pensionAge=v);
-    num(`e${i}`,v=>p.employerPensionRate=v);
+    num(`a${i}`,v=>p.age=v,18,95,true); num(`s${i}`,v=>p.sex=v,1,2,true);
+    num(`h${i}`,v=>p.health=v,0,3,true); num(`j${i}`,v=>p.trajectory=v,0,2,true);
+    num(`y${i}`,v=>p.salary=v,0,CASH); num(`k${i}`,v=>p.jobRisk=v,0,3,true);
+    num(`w${i}`,v=>p.workUntilAge=v,18,85,true);
+    num(`p${i}`,v=>p.pensionAge=v,50,85,true);
+    num(`e${i}`,v=>p.employerPensionRate=v,0,0.3);
+    num(`oc${i}`,v=>p.occClass=v,0,3,true); num(`ic${i}`,v=>p.existingCover=v,0,CASH);
+    // The field ties these two together; a link can set them independently.
+    p.workUntilAge = Math.max(p.age, p.workUntilAge);
   }
-  num('cb',v=>S.cbar=v);
-  num('vs',v=>S.savings.shares=v); num('vb',v=>S.savings.bonds=v);
-  num('vc',v=>S.savings.cash=v); num('vp',v=>S.savings.pension=v);
-  num('ho',v=>S.own=!!v); num('hv',v=>S.homeValue=v); num('hm',v=>S.mortgageBalance=v);
-  num('hr',v=>S.mortgageRate=v); num('hy',v=>S.mortgageYears=v);
-  num('dz',v=>S.downsize=!!v); num('da',v=>S.downsizeAge=v); num('dr',v=>S.downsizeRelease=v);
-  num('rk',v=>S.riskPay=v); num('sh',v=>S.shape=v); num('sm',v=>S.smooth=v);
-  num('al',v=>S.alpha=v); num('fe',v=>S.fee=v); num('rf',v=>S.rf=v); num('ma',v=>S.maxAge=v);
-  num('oc',v=>S.occClass=v); num('ic',v=>S.existingCover=v);
-  num('ld',v=>S.loadingOverride=v);
-  if (q.has('bq')) S.beqMode=q.get('bq');
-  num('bf',v=>S.beqFixed=v); num('bw',v=>S.beqWeight=v);
+  num('cb',v=>S.cbar=v,0,CASH);
+  num('vs',v=>S.savings.shares=v,0,CASH); num('vb',v=>S.savings.bonds=v,0,CASH);
+  num('vc',v=>S.savings.cash=v,0,CASH); num('vp',v=>S.savings.pension=v,0,CASH);
+  num('ho',v=>S.own=!!v,0,1,true); num('hv',v=>S.homeValue=v,0,CASH);
+  num('hm',v=>S.mortgageBalance=v,0,CASH);
+  num('hr',v=>S.mortgageRate=v,-0.02,0.15); num('hy',v=>S.mortgageYears=v,0,50,true);
+  num('dz',v=>S.downsize=!!v,0,1,true); num('da',v=>S.downsizeAge=v,50,95,true);
+  num('dr',v=>S.downsizeRelease=v,0,1);
+  num('rk',v=>S.riskPay=v,0.005,0.20); num('sh',v=>S.shape=v,0,2,true);
+  num('sm',v=>S.smooth=v,0,2,true); num('al',v=>S.alpha=v,0,1);
+  num('fe',v=>S.fee=v,0,0.03); num('rf',v=>S.rf=v,-0.02,0.08);
+  num('ma',v=>S.maxAge=v,70,115,true);
+  /* Occupation and cover were household-level until they became per-person.
+     Links minted before that carry the old keys; read them onto the first
+     earner so a shared scenario does not quietly lose them. */
+  if (!q.has('oc0')) num('oc',v=>S.people[0].occClass=v,0,3,true);
+  if (!q.has('ic0')) num('ic',v=>S.people[0].existingCover=v,0,CASH);
+  num('ld',v=>S.loadingOverride=v,0,1.5);
+  if (['none','fixed','opt'].includes(q.get('bq'))) S.beqMode=q.get('bq');
+  num('bf',v=>S.beqFixed=v,0,CASH); num('bw',v=>S.beqWeight=v,0,2,true);
 }
 
 /* ------------------------------------------------------------------- init */
@@ -895,7 +986,11 @@ function setText() {
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
   set('t-chSurv', T.chSurv); set('t-chSurvD', S.couple ? T.chSurvDesc : T.chSurvSingle);
   set('t-bsTitle', T.bsTitle); set('t-bsDesc', T.bsDesc);
-  set('t-ipTitle', T.ipTitle); set('t-ipDesc', T.ipDesc);
+  set('t-ipTitle', T.ipTitle);
+  /* The analysis prices ONE earner — the first. For a couple whose main earner
+     is the partner, that is the smaller half of the exposure, so the panel says
+     what it looked at rather than letting "your earnings" stand for both. */
+  set('t-ipDesc', S.couple ? T.ipDesc + ' ' + T.ipCoupleScope : T.ipDesc, S.couple);
   set('t-ipExplainT', T.ipExplainT); set('ipExplain', T.ipExplain, true);
   set('t-assets', T.assets); set('t-liabs', T.liabsNW);
   set('t-explain1', T.explain);
@@ -934,6 +1029,8 @@ function init() {
   });
   document.getElementById('share').addEventListener('click', async () => {
     const b = document.getElementById('share');
+    if (!urlWritable) { b.textContent = T.copyUnavailable;
+      setTimeout(()=>{ b.textContent = T.copyLink; }, 2600); return; }
     try { await navigator.clipboard.writeText(location.href); b.textContent = T.copied; }
     catch { b.textContent = 'Ctrl+C'; }
     setTimeout(()=>{ b.textContent = T.copyLink; }, 1800);
@@ -988,7 +1085,7 @@ let _lastShape = '';
 const _render = render;
 render = function () {
   const shape = [S.couple, S.own, S.downsize, S.beqMode].join('|');
-  if (shape !== _lastShape) { _lastShape = shape; buildRail(); setText(); }
+  if (shape !== _lastShape) { _lastShape = shape; buildRail(); buildInsuranceControls(); setText(); }
   _render();
 };
 

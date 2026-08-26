@@ -3,11 +3,15 @@
 Two interactive calculators that answer one question: **how much can you afford to spend,
 and how should you invest it, across your whole life?**
 
+**Live: [martin-cimprich.github.io/lifetime-financial-planner](https://martin-cimprich.github.io/lifetime-financial-planner/)**
+
 - `planner-uk.html` — United Kingdom, in English
 - `planner-cz.html` — Česká republika, v češtině
 
 Each is a single self-contained file. No build step, no dependencies, no backend, no
-tracking. Open it locally or upload it to any static host.
+tracking. Open it locally or upload it to any static host. `index.html` is a front page
+that offers the two and carries the disclaimer; it is hand-written rather than generated,
+and nothing depends on it.
 
 > **Educational tool, not financial advice.** It shows what one economic model implies
 > from the numbers you type. It knows nothing about your circumstances. Speak to a
@@ -66,8 +70,9 @@ W0 net worth                1625207.229845       1625207.229845   4.30e-15
 
 ### Three deliberate departures
 
-Both make the same mathematics more accurate rather than different, and both are marked
-`DEVIATION` in the source.
+All three are marked `DEVIATION` in `src/engine.mjs`. The first two make the same
+mathematics more accurate rather than different; the third replaces a heuristic that is
+strictly dominated by the alternative.
 
 1. **The optimal bequest.** The workbook evaluates CRRA utility as `(x^pow − 1)/pow`.
    With the default γ = 0.25 the exponent is −3, so for consumption around 60,000 the
@@ -104,7 +109,7 @@ Both make the same mathematics more accurate rather than different, and both are
 | **Job risk** | How share-like your earnings are drives how many shares your savings should hold. A civil servant's income is a bond; a founder's is not. |
 | **Early retirement** | "Stop working at" and "state pension starts at" are separate. Set the first below the second and the model shows the income gap and warns about it. |
 | **Disability risk** | Earnings arrive only while you can earn. Human capital is weighted by published disability incidence (CMI WP48 for the UK, ČSSZ invalidity awards for Czechia), which lowers human capital, spending and the recommended equity share. Treating a salary as a risk-free bond was the model's most flattering assumption. |
-| **Income protection** | Priced from that same incidence and sized from your own balance sheet: the chance it happens, the cover that makes you whole, the cover worth buying at the market's margin, and what it costs. The margin is estimated from your occupation rather than asked for. Campbell's self-insurance rule is shown alongside — and where the rule and the exact solve disagree, the copy says which is which. |
+| **Income protection** | Priced from that same incidence and sized from your own balance sheet: the chance it happens, the cover that makes you whole, the cover worth buying at the market's margin, and what it costs. The margin is estimated from your occupation rather than asked for. Each earner in a couple is priced separately, on their own occupation and their own existing cover, because a household's biggest exposure is usually one particular salary. Campbell's self-insurance rule is shown alongside — and where the rule and the exact solve disagree, the copy says which is which. |
 
 ## Country data
 
@@ -181,6 +186,13 @@ if the result is incomplete. See [AUDIT.md](AUDIT.md) for why that guard exists.
 | `src/i18n.js` | all user-facing copy, English and Czech |
 | `src/app.js` | interface and charts |
 | `src/build.mjs` | emits `planner-uk.html` and `planner-cz.html` |
+| `index.html` | the front page — hand-written, not generated |
+
+## Licence
+
+Non-commercial use only, inherited from the reference implementation — see [LICENSE](LICENSE)
+and [NOTICE.md](NOTICE.md). The restriction comes from Paul D. Kaplan's workbook and cannot
+be waived here; commercial use needs his permission as well as the author's.
 
 ## Independent audit
 

@@ -190,3 +190,90 @@ in the UK, `518 892` in Czechia), the fees card removed, the spending chart resc
 full 5th–95th band is visible rather than clipped at the 75th, print made to work inside a
 sandboxed frame by opening a clean standalone copy, and a new "how safe is your income?"
 question driving the human-capital equity exposure that was previously hard-coded at 20%.
+
+
+---
+
+# Round three — the boundary cases
+
+Found by driving both built files in a browser rather than by reading the source, which is
+where the last two rounds' worst findings also came from.
+
+**A recommendation to buy £237 of income protection, printed directly above prose telling
+the reader to self-insure.** `insuranceAnalysis` finds the optimal cover by golden-section
+search on [0, b]. Golden section approaches a boundary optimum without ever reaching it, so
+whenever the honest answer was "buy nothing" it returned a small positive residue instead —
+about 1.3% of the bracket, which for the UK default couple is £237 of cover at £11 a year,
+and 2,981 Kč in the Czech build. The interface then rendered that search noise as a precise
+recommendation in the headline card, immediately above the Campbell paragraph saying the
+loss is below the line and should be carried. Fixed by comparing the search result against
+the endpoint and snapping to zero, which costs nothing because the endpoint was already
+being evaluated. The card and the two affected stat cards now say *none* and *not worth
+buying at this margin*, which is the answer. Asserted in `test-insurance.mjs`.
+
+**For a couple, the insurance panel priced one earner and did not say so.** The analysis
+takes a `who` argument that defaults to 0, and nothing ever passed anything else — so a
+household whose main earner is the partner was shown the smaller half of its own exposure
+under the heading "your earnings are your largest asset". With the salaries split 1:5 the
+first earner needs no cover at all while the main earner needs 195,448 Kč: a factor of a
+hundred between the number shown and the number that mattered. The same single occupation
+answer was also applied to both partners' hazard, so a doctor married to a builder got one
+occupation class.
+
+Fixed properly rather than disclosed. Occupation class and cover already held moved from the
+household onto each person, the analysis runs once per earner, and the panel splits into a
+*You* and a *Your partner* section with the household total in the headline card. On the UK
+default with a £200,000 heavy-manual partner, the recommendation goes from £237 of cover at
+£11 a year to £18,311 at £5,030 — the difference between noise and the household's actual
+largest uninsured risk. Old links keep working: `oc` and `ic` are still read onto the first
+earner where `oc0`/`ic0` are absent.
+
+Splitting the panel also broke its copy, which was written throughout in the second person
+and now had to sit under a *Your partner* heading — "Chance it happens before **you** retire"
+about someone else. The card labels, the Campbell paragraph, the two controls and the
+over-insured note all gained neutral variants, used only when the sections are named; the
+single-earner case keeps the personal wording, where it is right and better.
+
+**Every recalculation threw where the document has no origin.** `writeURL` is the last
+statement in `render()`, and `history.replaceState` raises `SecurityError` outright in a
+sandboxed iframe, a `data:` URL, or a local viewer that inlines the file. The page still
+drew — the throw happens after everything is painted — so this was invisible except as an
+uncaught error on every keystroke, and as "Copy link" silently handing out a URL with no
+scenario in it. Now caught, with the share button saying so instead of pretending.
+
+**A link bypassed every input clamp.** The number fields were hardened in round one because
+`min`/`max` attributes do not constrain typing or pasting. `readURL` writes straight into
+state, so the same values arriving in a URL skipped all of it — `?e0=-500000` puts an
+employer contribution of −500000% into the model. In practice the engine absorbed everything
+thrown at it (twenty hostile parameter cases produced no `NaN`, no `Infinity`, no bad SVG
+coordinate and no unhandled throw, which is a good sign about the engine rather than about
+the URL layer), but the guard was one-sided. `readURL` now enforces the same bounds
+`buildRail` does, whitelists `beqMode`, rounds the whole-number fields, and re-imposes the
+one cross-field constraint the interface maintains.
+
+**Two departures from the workbook were documented as marked in the source and were not.**
+`NOTICE.md` promised that every deviation carries a `DEVIATION` marker in `src/engine.mjs`.
+Only the third, the long-only allocation, did — the two numerical ones had no marker at all,
+and `NOTICE.md` did not mention the third. Markers added, `NOTICE.md` and `README.md`
+corrected. This matters more than it looks: the marker is the only thing telling a future
+reader which lines must not be "fixed" back to matching the VBA.
+
+**`disabilityRate` defaulted to the wrong occupation class.** Documented as taking 0–3 with
+0 for clerical work, and called with 0 throughout the application, but its default parameter
+was 1 — so any caller omitting it would silently get CMI class 2 at 1.2× the claim rate.
+The test harness was in fact using `?? 1` where the application uses `?? 0`. No shipped
+number was wrong, because nothing omits the argument; the trap is closed and the harness
+aligned with what the application actually does.
+
+## What these changed
+
+| | before | after |
+|---|---|---|
+| UK couple, income cover worth buying | £237 at £11/yr | none, or the partner's real figure |
+| UK couple, £200k heavy-manual partner | £237 at £11/yr | £18,311 at £5,030/yr |
+| CZ couple, income cover worth buying | 2 981 Kč at 106 Kč/yr | none |
+| single-earner cases | unchanged | unchanged |
+
+No headline spending figure moved anywhere. With the exception of the couples fix, every one
+of these was a defect in what the tool *said* rather than in what it computed — which is the
+pattern of all three rounds.

@@ -6,8 +6,8 @@ import { disabilityRate, abilityToWork, probDisabledBefore } from './disability.
 const ctxFor = (C) => ({
   mortalityTable: C.lifeTable, salaryCurve: C.salaryCurve,
   statePension: (p, h) => C.statePension(p, h), tax: C.tax.bind(C),
-  hazard: (person, age) => disabilityRate(C.code, age, person.sex, person.occClass ?? 1),
-  ability: (person, age) => abilityToWork(C.code, person.age, age, person.sex, person.occClass ?? 1),
+  hazard: (person, age) => disabilityRate(C.code, age, person.sex, person.occClass ?? 0),
+  ability: (person, age) => abilityToWork(C.code, person.age, age, person.sex, person.occClass ?? 0),
 });
 const paramsFor = (C, o = {}) => {
   const st = Math.round(C.pensionAgeFor(1991));
@@ -152,6 +152,13 @@ for (const C of [UK, CZ]) {
   ok('and agree again once the markup is high enough',
      !far.worthInsuring && far.bestCover < far.needCover * 0.05,
      `exact buys ${(100*far.bestCover/far.needCover).toFixed(0)}% of full`);
+  /* Golden-section search approaches a boundary optimum without reaching it,
+     so "buy nothing" came back as a small positive residue. The interface then
+     showed that residue as a precise recommendation, sitting directly above prose
+     telling the reader to self-insure. Nothing must be exactly nothing. */
+  ok('and "nothing" is exactly nothing, not search residue',
+     far.bestCover === 0 && far.bestPremium === 0 && far.extraCover === 0,
+     `buy ${f(far.bestCover)}, premium ${f(far.bestPremium)}`);
 
   // --- cover already in force --------------------------------------------
   const half = Math.round(r.bestCover / 2);
@@ -179,6 +186,49 @@ for (const C of [UK, CZ]) {
      `${f(covHH.H0)} <= ${f(noRisk.H0)}`);
 
   // --- occupation and sex move the price the way the data says ------------
+  /* --- couples ----------------------------------------------------------
+     insuranceAnalysis prices ONE person at a time, chosen by `who`, which defaults
+     to 0. With a secondary earner in slot 0 the household's real exposure is the
+     partner's salary, and the default call alone would miss it entirely — so the
+     interface runs the analysis once per earner. These pin down that the two
+     answers are genuinely different and genuinely personal. */
+  const stC = Math.round(C.pensionAgeFor(1991));
+  const mkPerson = (salary, occClass = 1) => ({ age: 35, sex: 1, healthShift: 0,
+    trajectory: 1, salary, workUntilAge: stC, pensionAge: stC, statutoryPensionAge: stC,
+    employerPensionRate: 0.03, birthYear: 1991, occClass });
+  const coupleP = paramsFor(C, { people: [
+    mkPerson(Math.round(C.defaults.salary * 0.4)),
+    mkPerson(Math.round(C.defaults.salary * 2.0)),
+  ] });
+  const who0 = insuranceAnalysis(coupleP, ctx, { loading: 0.5 });
+  const who1 = insuranceAnalysis(coupleP, ctx, { loading: 0.5, who: 1 });
+  console.log('');
+  console.log(`  couple earning ${f(coupleP.people[0].salary)} and ${f(coupleP.people[1].salary)}:`);
+  console.log(`    slot 0, the lesser earner : need ${f(who0.needCover)}  buy ${f(who0.bestCover)}`);
+  console.log(`    slot 1, the main earner   : need ${f(who1.needCover)}  buy ${f(who1.bestCover)}`);
+  ok('each earner is priced on their own salary',
+     who1.needCover > who0.needCover * 1.5,
+     `slot 0 needs ${f(who0.needCover)}, the main earner needs ${f(who1.needCover)}`);
+  ok('and pricing only the first would miss most of the exposure',
+     who1.bestCover > who0.bestCover,
+     `${f(who1.bestCover)} vs ${f(who0.bestCover)} worth buying`);
+
+  /* Occupation is per person: one shared answer gave a doctor married to a
+     builder a single occupation class. */
+  const heavyPartner = paramsFor(C, { people: [
+    mkPerson(Math.round(C.defaults.salary * 0.4)),
+    mkPerson(Math.round(C.defaults.salary * 2.0), 3),
+  ] });
+  const h0 = insuranceAnalysis(heavyPartner, ctx, { loading: 0.5 });
+  const h1 = insuranceAnalysis(heavyPartner, ctx, { loading: 0.5, who: 1 });
+  ok('one partner’s occupation does not move the other’s price',
+     Math.abs(h0.fairRate - who0.fairRate) < 1e-12,
+     `slot 0 unchanged at ${h0.fairRate.toFixed(4)}`);
+  ok('and heavier work raises that partner’s own price',
+     h1.fairRate > who1.fairRate * 1.3,
+     `${h1.fairRate.toFixed(4)} vs ${who1.fairRate.toFixed(4)}`);
+
+
   const manual = insuranceAnalysis(paramsFor(C, { person: { occClass: 3 } }), ctx, { loading: 0.5 });
   ok('manual work costs more to insure', manual.fairRate > r.fairRate,
      `${manual.fairRate.toFixed(4)} vs ${r.fairRate.toFixed(4)}`);

@@ -53,8 +53,8 @@ Foundation.
 
 ## Deviations from the reference implementation
 
-Two changes were made. Both are numerical, both are marked `DEVIATION` in
-`src/engine.mjs`, and both make the same mathematics more accurate rather than different:
+Three changes were made. All are marked `DEVIATION` in `src/engine.mjs`. The first two
+are numerical and make the same mathematics more accurate rather than different:
 
 1. The optimal bequest is found by golden-section search on a numerically stable form of
    the objective, instead of a 99-point grid search on a form that loses the entire signal
@@ -64,6 +64,14 @@ Two changes were made. Both are numerical, both are marked `DEVIATION` in
 
 Passing `bisectTol = 1e-8` and pinning the bequest reproduces the workbook bit-for-bit;
 `src/test-reduction.mjs` asserts this.
+
+The third is economic. `ReallocNeg`, which imposes the long-only constraint, zeroes the
+negative positions and rescales all the positives proportionally — which scales equity down
+alongside cash and so moves away from the target equity exposure rather than toward it. It
+is strictly dominated: in a worked case it landed 124,580 short of the target where an
+all-equity portfolio was only 93,872 short. It is replaced by a projection that gets equity
+as close to target as the budget allows. `reallocNeg` is retained for exact reproduction of
+the workbook.
 
 ## Data sources
 

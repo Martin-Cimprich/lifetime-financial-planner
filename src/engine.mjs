@@ -109,6 +109,12 @@ export function globalStockFraction() {
   return g / s;
 }
 const sdStocksFn = (rf, s) => { const o = Math.exp(s * s); return (1 + rf) * o * Math.sqrt(o - 1); };
+/**
+ * DEVIATION (numerical). The workbook's SigmaSDFFn stops bisecting at 1e-8,
+ * which leaves ~6e-8 relative error in every quantity downstream of it. The
+ * tolerance costs nothing to tighten. Pass tol = 1e-8 to reproduce the workbook
+ * bit-for-bit; test-reduction.mjs does exactly that.
+ */
 function sigmaSDFFn(rf, sd, tol = 1e-13) {
   let lo = 0, hi = 2 * sd, mid = 0;
   if ((sdStocksFn(rf, lo) - sd) * (sdStocksFn(rf, hi) - sd) > 0) return NaN;
@@ -407,7 +413,18 @@ export class Household {
     return s;
   }
 
-  /* --- bequest (numerically stable forms) -------------------------------- */
+  /* --- bequest (numerically stable forms) --------------------------------
+     DEVIATION (numerical). The workbook evaluates CRRA utility as
+     (x^pow - 1)/pow. At the default gamma = 0.25 the exponent is -3, so for
+     consumption around 60,000 the x^pow term is ~5e-15 against a constant of
+     1/3: the entire economic signal falls below double precision and the
+     reported optimum is floating-point noise. Dropping the additive constant is
+     an exact monotone transformation, so the maximiser is unchanged while the
+     cancellation disappears — and the certainty-equivalent then collapses to a
+     weighted power mean. With goldenMax in place of the workbook's 99-point grid
+     the answer matches 50-digit arithmetic to 4e-7 %. At the workbook's own
+     defaults this moves the optimal bequest by 12.5% and headline spending by
+     about 2.5%. */
   consumpConstEquiv(beq, w0SansLI, ctx) {
     const { D0, W, wSum, IV, liPerm0 } = ctx;
     const cd0 = (w0SansLI - beq * liPerm0) / D0;
@@ -745,7 +762,14 @@ export function insuranceAnalysis(p, ctx, opts = {}) {
   }
   const bestFrac = (a2 + b2) / 2;
 
-  const need = evaluate(needFrac), best = evaluate(bestFrac), none = evaluate(0);
+  const need = evaluate(needFrac), none = evaluate(0);
+  /* Golden-section approaches a boundary optimum without ever reaching it, so
+     when no cover is worth buying it returns a small positive residue rather
+     than zero. That residue is search noise, not advice: it surfaced in the
+     interface as a card recommending 237 of cover directly above prose telling
+     the reader to self-insure. Compare against the endpoint and snap. */
+  let best = evaluate(bestFrac);
+  if (best.eu <= none.eu) best = none;
 
   /* Campbell's self-insurance rule. With a proportional markup L and relative
      risk aversion gamma, the optimum leaves you still exposed to a fall of

@@ -3,8 +3,13 @@
 Notes and recommendations from reading the monograph (Part I), reverse-engineering the
 workbook's 46 VBA functions, and rebuilding the engine in JavaScript.
 
-**What ships alongside this document:** `lifecycle-model.html` — a single self-contained file,
-no installer, no macros, no dependencies. Open it, or upload it to any static host.
+> **Historical record.** This is the note written at the end of the port, before any of the
+> country, couples, housing, tax or insurance work existed. It is kept because it says why
+> the project was started and what was wrong with the original, and because §2 is the bug
+> report that still needs sending upstream. It is *not* current documentation: the single
+> file it describes (`lifecycle-model.html`) and the test suite it names
+> (`test-engine.mjs`) have both been superseded — see [README.md](README.md) for what
+> exists now, and items 1, 5, 6, 7 and 8 of §6 are done.
 
 ---
 

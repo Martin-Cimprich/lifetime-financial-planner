@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lifetime Financial Planner</title>
+<meta name="description" content="How much you can afford to spend across your whole life, and how to invest it. Two builds: United Kingdom and Česká republika.">
+
+<style>
+:root {
+  color-scheme: light dark;
+  --paper:#FAF9F6; --surface:#FFF; --line:#DFDDD5;
+  --ink:#16202B; --ink-2:#4A5763; --ink-3:#77828C;
+  --teal:#0B7A6A; --amber:#9A6511;
+  --radius:10px;
+  --shadow:0 1px 2px rgba(22,32,43,.06),0 4px 16px rgba(22,32,43,.05);
+  --serif: ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --sans: ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --paper:#0E141A; --surface:#151D25; --line:#2B3742;
+  --ink:#E6E9EB; --ink-2:#A5B0BA; --ink-3:#7C8892;
+  --teal:#3FBCA6; --amber:#D6A445;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 4px 16px rgba(0,0,0,.3);}}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2{font-family:var(--serif);font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+a{color:var(--teal)}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px;border-radius:3px}
+.eyebrow{font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3)}
+
+.wrap{max-width:760px;margin:0 auto;padding:64px 22px 56px}
+h1{font-size:30px;margin-bottom:10px}
+.lede{color:var(--ink-2);font-size:17px;margin:0 0 8px}
+.idea{font-family:var(--serif);font-size:17px;line-height:1.5;color:var(--ink);
+  border-left:3px solid var(--teal);padding:2px 0 2px 16px;margin:30px 0}
+
+.picks{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:34px 0 30px}
+@media (max-width:620px){.picks{grid-template-columns:1fr}.wrap{padding-top:40px}}
+.pick{display:block;text-decoration:none;color:inherit;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.pick:hover{border-color:var(--teal)}
+.pick .name{font-family:var(--serif);font-size:19px;font-weight:600;margin:5px 0 6px;color:var(--teal)}
+.pick .what{font-size:13.5px;color:var(--ink-2);line-height:1.5}
+
+.note{font-size:13.5px;color:var(--ink-2);border-top:1px solid var(--line);padding-top:18px;margin-top:34px}
+.note p{margin:0 0 10px}
+.note p:last-child{margin-bottom:0}
+b{color:var(--ink)}
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Educational tool &middot; not financial advice</div>
+  <h1>Lifetime Financial Planner</h1>
+  <p class="lede">How much you can afford to spend, and how you should invest it, across
+    your whole life.</p>
+
+  <p class="idea">Your future salary is an asset on your balance sheet, and it behaves like
+    a bond. That is <i>why</i> a young person should hold shares — not because they “have
+    time to recover”, but because they are already holding an enormous bond, and shares are
+    what balances it.</p>
+
+  <div class="picks">
+    <a class="pick" href="planner-uk.html">
+      <div class="eyebrow">United Kingdom &middot; English</div>
+      <div class="name">Open the UK planner</div>
+      <div class="what">Income tax and National Insurance for 2025/26, the new State Pension,
+        ONS life tables and ASHE earnings.</div>
+    </a>
+    <a class="pick" href="planner-cz.html">
+      <div class="eyebrow">Česká republika &middot; česky</div>
+      <div class="name">Otevřít českou verzi</div>
+      <div class="what">Daň z příjmu a pojistné 2026, starobní důchod podle ČSSZ,
+        úmrtnostní tabulky ČSÚ a mzdy podle ISPV.</div>
+    </a>
+  </div>
+
+  <div class="note">
+    <p><b>This is not financial advice.</b> It shows what one economic model implies from the
+      numbers you type. It knows nothing about your circumstances, and it makes no allowance
+      for children, divorce, redundancy, long-term care, or changes in the law. Speak to a
+      qualified adviser before acting on anything it says.</p>
+    <p>An implementation of the parent life-cycle model from Idzorek and Kaplan,
+      <i>Lifetime Financial Advice</i> (CFA Institute Research Foundation, 2024), and of the
+      accompanying Excel workbook, © 2026 Paul D. Kaplan. <b>Non-commercial use only</b>,
+      inherited from that workbook. Neither the CFA Institute Research Foundation nor the
+      authors have endorsed, reviewed or approved this implementation.</p>
+    <p>Source, data sources and the record of what has been found and fixed:
+      <a href="https://github.com/Martin-Cimprich/lifetime-financial-planner">github.com/Martin-Cimprich/lifetime-financial-planner</a>.
+      Both planners are single self-contained files — no backend, no tracking, nothing is
+      sent anywhere.</p>
+  </div>
+</div>
+</html>

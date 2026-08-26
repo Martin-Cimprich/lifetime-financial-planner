@@ -82,9 +82,9 @@ const interp = (table, age) => {
  * @param country 'UK' | 'CZ'
  * @param age
  * @param sex 1 male, 2 female
- * @param occClass 0-3, CMI classes 1-4
+ * @param occClass 0-3, CMI classes 1-4 (0 = professional/clerical)
  */
-export function disabilityRate(country, age, sex, occClass = 1) {
+export function disabilityRate(country, age, sex, occClass = 0) {
   const base = country === 'CZ'
     ? interp(CZ_3RD_PER_1000, age) / 1000
     : interp(UK_DP52_PER_1000, age) / 1000 * UK_CURRENCY_SCALE;
@@ -94,7 +94,7 @@ export function disabilityRate(country, age, sex, occClass = 1) {
 }
 
 /** Probability of still being able to earn at `age`, starting able at `from`. */
-export function abilityToWork(country, from, age, sex, occClass = 1) {
+export function abilityToWork(country, from, age, sex, occClass = 0) {
   let p = 1;
   for (let a = Math.floor(from); a < Math.floor(age); a++) {
     p *= (1 - disabilityRate(country, a, sex, occClass));
@@ -104,7 +104,7 @@ export function abilityToWork(country, from, age, sex, occClass = 1) {
 }
 
 /** Cumulative probability of becoming unable to earn between two ages. */
-export const probDisabledBefore = (country, from, to, sex, occClass = 1) =>
+export const probDisabledBefore = (country, from, to, sex, occClass = 0) =>
   1 - abilityToWork(country, from, to, sex, occClass);
 
 /**
