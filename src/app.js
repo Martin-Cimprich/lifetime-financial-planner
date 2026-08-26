@@ -180,11 +180,13 @@ function fieldMoney(label, get, set, hint) {
   });
   inp.addEventListener('focus', () => { const v = get(); inp.value = Number.isFinite(v) ? String(Math.round(v)) : ''; });
   inp.addEventListener('blur',  () => { inp.value = fmtGroup(get()); });
-  return el('div', { class:'field' }, [
+  const f = el('div', { class:'field' }, [
     el('span', { class:'flabel', text:label }),
     el('div', { class:'money' }, [el('span', { class:'cur', text:sym }), inp]),
     hint ? el('div', { class:'hint', text:hint }) : null,
   ]);
+  f._update = () => { if (document.activeElement !== inp) inp.value = fmtGroup(get()); };
+  return f;
 }
 function fieldNum(label, get, set, min, max, step, suffix) {
   const inp = el('input', { type:'number', min, max, step, 'aria-label':label });
@@ -207,7 +209,9 @@ function fieldNum(label, get, set, min, max, step, suffix) {
   const box = suffix
     ? el('div', { class:'withSuffix' }, [inp, el('span', { class:'suffix', text:suffix })])
     : inp;
-  return el('div', { class:'field' }, [el('span', { class:'flabel', text:label }), box]);
+  const f = el('div', { class:'field' }, [el('span', { class:'flabel', text:label }), box]);
+  f._update = () => { if (document.activeElement !== inp) inp.value = get(); };
+  return f;
 }
 function seg(label, opts, get, set, help, column) {
   const box = el('div', { class:'seg' + (column ? ' col' : ''), role:'group' });
@@ -410,6 +414,132 @@ function buildRail() {
   ], false));
 }
 
+/* ------------------------------------------------------------ walkthrough */
+/* The model contains one idea most people have never met, and a page full of
+   controls is a poor way to meet it. Five steps, one idea each, one control
+   each — driving the real model, so the charts below move as the reader plays.
+   It borrows the state rather than taking it: whatever the reader does here can
+   be kept or handed back at the end. */
+let tour = null;   // { step, saved }
+
+const TOUR = [
+  { t:'tour1T', b:'tour1B',
+    control: () => slider(T.tourAge, () => S.people[0].age, v => {
+      S.people[0].age = Math.round(v);
+      const pa = Math.round(C.pensionAgeFor(CY - S.people[0].age));
+      S.people[0].pensionAge = pa;
+      if (S.people[0].workUntilAge > pa) S.people[0].workUntilAge = pa;
+    }, 22, 70, 1, v => v.toFixed(0), '22', '70'),
+    fig: R => ({ k: T.rowHC, v: moneyK(R.H0),
+                 n: fill(T.tour1Fig, { p: pct(R.H0 / Math.max(1, R.F0 + R.H0)) }) }) },
+
+  { t:'tour2T', b:'tour2B',
+    control: () => seg(T.jobRisk, T.jobRiskOpts, () => S.people[0].jobRisk ?? 1,
+                       v => S.people[0].jobRisk = v, T.jobRiskHelp, true),
+    fig: R => ({ k: T.cardEquity,
+                 v: R.years[0].equityShareCon == null ? T.noSavingsShort
+                    : pct(R.years[0].equityShareCon),
+                 n: T.tour2Fig }) },
+
+  { t:'tour3T', b:'tour3B',
+    control: () => slider(T.tourRisk, () => S.riskPay * 100, v => S.riskPay = v / 100,
+                          0.5, 20, 0.5, v => v.toFixed(1) + '%', T.qRiskNothing, T.qRiskLots),
+    fig: R => ({ k: T.cardEquity,
+                 v: R.years[0].equityShareCon == null ? T.noSavingsShort
+                    : pct(R.years[0].equityShareCon),
+                 n: fill(T.tour3Fig, { g: riskAversionFromGamble(S.riskPay).toFixed(1) }) }) },
+
+  { t:'tour4T', b:'tour4B',
+    // Nobody can stop working before today, so the floor is the reader's age.
+    control: () => slider(T.stopWork, () => S.people[0].workUntilAge,
+                          v => S.people[0].workUntilAge = Math.round(v),
+                          S.people[0].age, 80, 1, v => v.toFixed(0),
+                          String(S.people[0].age), '80'),
+    fig: R => ({ k: T.heroLabel, v: money(R.CD0),
+                 n: fill(T.tour4Fig, { m: money(R.CD0 / 12) }) }) },
+
+  { t:'tour5T', b:'tour5B',
+    control: () => seg(T.ipOcc, T.ipOccOpts, () => S.people[0].occClass ?? 0,
+                       v => { S.people[0].occClass = v; }, T.ipOccHelp, true),
+    fig: () => {
+      const r = (ipLast || []).filter(Boolean)[0];
+      if (!r) return { k: T.ipProb, v: '—', n: '' };
+      return { k: T.ipProb, v: pct(r.probability, 1),
+               n: fill(T.tour5Fig, { c: r.bestCover > 0 ? money(r.bestCover) : T.cardIPNothingV }) };
+    } },
+];
+
+function startTour() {
+  tour = { step: 0, saved: JSON.parse(JSON.stringify(S)) };
+  buildTour(); render();
+  document.getElementById('tour')?.scrollIntoView({ block:'start' });
+}
+/** keep = true leaves the reader wherever the walkthrough took them. */
+function endTour(keep) {
+  const saved = tour?.saved;
+  tour = null;
+  if (!keep && saved) {
+    S = saved; compareWith = null;
+    buildRail(); buildInsuranceControls(); setText(); buildScenarios();
+  }
+  buildTour(); render();
+}
+
+function buildTour() {
+  const host = document.getElementById('tour');
+  if (!host) return;
+  host.innerHTML = '';
+  if (!tour) { host.hidden = true; return; }
+  host.hidden = false;
+  const st = TOUR[tour.step], last = tour.step === TOUR.length - 1;
+
+  const close = el('button', { class:'tclose', type:'button', text:T.tourClose });
+  close.addEventListener('click', () => endTour(false));
+  host.appendChild(el('div', { class:'thead' }, [
+    el('div', { class:'eyebrow', text: fill(T.tourOf, { i: tour.step + 1, n: TOUR.length }) }),
+    close,
+  ]));
+  host.appendChild(el('h2', { text: T[st.t] }));
+  host.appendChild(el('p', { class:'tbody', html: T[st.b] }));
+
+  const figBox = el('div', { class:'tfig', id:'tour-fig' });
+  host.appendChild(el('div', { class:'tgrid' }, [
+    el('div', { class:'tctl' }, [st.control()]),
+    figBox,
+  ]));
+
+  const nav = el('div', { class:'tnav' });
+  const back = el('button', { type:'button', text:T.tourBack });
+  if (tour.step === 0) back.setAttribute('disabled', '');
+  back.addEventListener('click', () => { tour.step--; buildTour(); render(); });
+  nav.appendChild(back);
+  if (last) {
+    const keep = el('button', { class:'pri', type:'button', text:T.tourKeep });
+    keep.addEventListener('click', () => endTour(true));
+    const undo = el('button', { type:'button', text:T.tourRestore });
+    undo.addEventListener('click', () => endTour(false));
+    nav.appendChild(keep); nav.appendChild(undo);
+  } else {
+    const next = el('button', { class:'pri', type:'button', text:T.tourNext });
+    next.addEventListener('click', () => { tour.step++; buildTour(); render(); });
+    nav.appendChild(next);
+  }
+  const dots = el('div', { class:'dots' });
+  TOUR.forEach((_, i) => dots.appendChild(el('i', { class: i === tour.step ? 'on' : '' })));
+  nav.appendChild(dots);
+  host.appendChild(nav);
+}
+
+/** The one figure the current step is about, refreshed with everything else. */
+function paintTour(R) {
+  if (!tour) return;
+  const box = document.getElementById('tour-fig');
+  if (!box) return;
+  const f = TOUR[tour.step].fig(R);
+  box.innerHTML = `<div class="k">${f.k}</div><div class="v">${f.v}</div>` +
+                  (f.n ? `<div class="n">${f.n}</div>` : '');
+}
+
 /* -------------------------------------------------------------- scenarios */
 /* "Retire at 62" against "retire at 67" is the question people actually have,
    and until now the tool could hold only one answer at a time. A saved scenario
@@ -487,6 +617,7 @@ function buildScenarios() {
     chip.appendChild(el('span', { class:'fig', text:scenFigure(sc.state) }));
     const load = el('button', { type:'button', text:T.scenLoad });
     load.addEventListener('click', () => {
+      tour = null; buildTour();
       S = JSON.parse(JSON.stringify(sc.state));
       touched = true; compareWith = null;
       buildRail(); buildInsuranceControls(); setText(); buildScenarios(); render();
@@ -911,6 +1042,7 @@ function paintIPCard() {
   if (n) n.textContent = extraCover <= 0
     ? T.cardIPNone
     : fill(T.cardIPNote, { prem: money(extraPrem) });
+  if (tour && lastR) paintTour(lastR);
 }
 
 /* One occupation answer and one cover figure per earner. Sharing them across a
@@ -986,7 +1118,7 @@ function render() {
   // One extra solve per render when a scenario is pinned; the model runs in
   // under 2 ms, so the comparison is live rather than a button you press.
   const cmp = comparedResult();
-  drawHeadline(R, cmp); drawAlerts(R); paintIPCard();
+  drawHeadline(R, cmp); drawAlerts(R); paintIPCard(); paintTour(R);
   drawSpend(R, cmp); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawInsurance();
 
   const so = document.getElementById('shape-out');
@@ -1019,7 +1151,7 @@ function render() {
       { eq: pct(eq), note: eq <= 0.15 ? T.jobRiskNoteLow : T.jobRiskNoteHigh });
   });
   // Refresh every control's visible state without rebuilding the rail.
-  document.querySelectorAll('.field.slider, .field.seg-field').forEach(f => f._update && f._update());
+  document.querySelectorAll('.field').forEach(f => f._update && f._update());
   writeURL();
 }
 
@@ -1133,6 +1265,7 @@ function setText() {
   set('t-sub', T.sub);
   set('t-discb', T.disclaimerBold); set('t-disc', T.disclaimer);
   set('print', T.print); set('share', T.copyLink); set('reset', T.reset); set('theme', T.theme);
+  set('tourbtn', T.tourStart);
   set('t-chSpend', T.chSpend); set('t-chSpendD', S.own ? T.chSpendDesc : T.chSpendDescRent);
   set('t-chWealth', T.chWealth); set('t-chWealthD', T.chWealthDesc);
   set('t-chGlide', T.chGlide); set('t-chGlideD', T.chGlideDesc);
@@ -1172,6 +1305,9 @@ function init() {
   scenLoadAll();
   buildScenarios();
 
+  document.getElementById('tourbtn').addEventListener('click', () => {
+    if (tour) endTour(false); else startTour();
+  });
   document.getElementById('theme').addEventListener('click', () => {
     const cur = document.documentElement.getAttribute('data-theme');
     const sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
@@ -1179,6 +1315,7 @@ function init() {
     render();
   });
   document.getElementById('reset').addEventListener('click', () => {
+    tour = null; buildTour();
     S = freshState(); touched = false; compareWith = null;
     buildRail(); buildInsuranceControls(); buildScenarios(); render();
   });

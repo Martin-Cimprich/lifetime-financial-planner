@@ -27,6 +27,33 @@ en: {
   jobRiskNoteLow: 'That is a large bond you already own, which is why shares belong in your savings.',
   jobRiskNoteHigh: 'You already carry equity risk through your job, so your savings should carry less.',
   printBlocked: 'Use Ctrl+P',
+  tourStart: 'The idea',
+  tourOf: 'The idea · {i} of {n}',
+  tourNext: 'Next', tourBack: 'Back', tourClose: 'Close',
+  tourKeep: 'Keep these numbers', tourRestore: 'Put my plan back',
+  tourAge: 'Your age',
+  tourRisk: 'What you would pay to avoid the coin toss',
+
+  tour1T: 'Your salary is an asset',
+  tour1B: 'You own more than what sits in your accounts. Everything you will earn between now and the day you stop working is on your balance sheet <i>today</i> — discounted for how long you have to wait for it, for the chance you are alive to collect it, and for the chance you are still able to work. For most people under forty it is the largest thing they own, by a wide margin. Move your age and watch it drain away.',
+  tour1Fig: '{p} of everything you own',
+
+  tour2T: 'And it behaves like a bond',
+  tour2B: 'A salary that arrives whatever the market does is a bond: a long, dull, reliable stream of payments. A salary that rises and falls with markets is not — it is closer to a share you are not allowed to sell. Which one is yours?',
+  tour2Fig: 'of your savings, in shares',
+
+  tour3T: 'Which is why a young person should hold shares',
+  tour3B: 'Not because they “have time to recover” — that is a comforting phrase the arithmetic does not support. It is because they are <i>already</i> holding an enormous bond, and shares are what balances it. Your own appetite for risk moves the answer as well, and here is the question that measures it: a coin is tossed on your lifetime wealth. Heads it rises by a fifth, tails it falls by a fifth. How much would you pay to walk away?',
+  tour3Fig: 'That answer implies a risk aversion of {g}.',
+
+  tour4T: 'What the balance sheet buys is spending',
+  tour4B: 'Net worth is not the point; it is fuel. Divide it by how long it has to last — allowing for the fact that you might live a very long time — and you get the only number anyone came here for: what you can spend every year, in today’s money, for the rest of your life. Move the year you stop working and see what a few more years of earning are worth.',
+  tour4Fig: '{m} a month, for life',
+
+  tour5T: 'The one asset you cannot diversify',
+  tour5B: 'You can spread your savings across a thousand companies in an afternoon. You cannot hold a portfolio of careers. If your earnings are the biggest thing you own, then the biggest risk on your balance sheet is not a market fall — it is that the earnings stop. That is what income protection is for, and how much of it is worth buying comes out of your own balance sheet rather than a rule of thumb.',
+  tour5Fig: 'Cover worth buying: {c}',
+
   scenSummary: 'Compare two plans',
   scenSummaryN: 'Compare two plans ({n} saved)',
   scenNamePh: 'Name this plan, then save it',
@@ -232,6 +259,33 @@ cs: {
   jobRiskNoteLow: 'To je velký dluhopis, který už vlastníte — proto do úspor patří akcie.',
   jobRiskNoteHigh: 'Akciové riziko už nesete v práci, takže vaše úspory ho mají nést méně.',
   printBlocked: 'Použijte Ctrl+P',
+  tourStart: 'O co jde',
+  tourOf: 'O co jde · {i} z {n}',
+  tourNext: 'Dál', tourBack: 'Zpět', tourClose: 'Zavřít',
+  tourKeep: 'Nechat tato čísla', tourRestore: 'Vrátit můj plán',
+  tourAge: 'Váš věk',
+  tourRisk: 'Kolik byste zaplatili, abyste se hodu vyhnuli',
+
+  tour1T: 'Váš plat je aktivum',
+  tour1B: 'Nevlastníte jen to, co máte na účtech. Všechno, co vyděláte ode dneška do chvíle, kdy přestanete pracovat, je na vaší rozvaze <i>už teď</i> — po odečtení toho, jak dlouho se na to čeká, jaká je šance, že se toho dožijete, a jaká je šance, že ještě budete moci pracovat. Pro většinu lidí do čtyřiceti je to zdaleka to nejcennější, co mají. Posuňte věk a sledujte, jak se to ztrácí.',
+  tour1Fig: '{p} všeho, co vlastníte',
+
+  tour2T: 'A chová se jako dluhopis',
+  tour2B: 'Plat, který chodí bez ohledu na to, co dělají trhy, je dluhopis: dlouhý, nudný, spolehlivý tok plateb. Plat, který s trhy stoupá a klesá, dluhopis není — je blíž akcii, kterou nesmíte prodat. Který z nich je ten váš?',
+  tour2Fig: 'vašich úspor v akciích',
+
+  tour3T: 'Proto má mladý člověk držet akcie',
+  tour3B: 'Ne proto, že „má čas to vysedět“ — to je uklidňující věta, kterou počty nepodpírají. Je to proto, že už <i>drží</i> obrovský dluhopis a akcie jsou to, co ho vyvažuje. Svou roli hraje i vaše vlastní ochota riskovat, a tady je otázka, která ji měří: hodí se mincí o vaše celoživotní bohatství. Panna ho zvedne o pětinu, orel o pětinu srazí. Kolik byste zaplatili, abyste se hodu vyhnuli?',
+  tour3Fig: 'Ta odpověď odpovídá averzi k riziku {g}.',
+
+  tour4T: 'Rozvaha se nakonec mění na výdaje',
+  tour4B: 'Čisté jmění není cíl; je to palivo. Vydělte ho tím, jak dlouho musí vydržet — a počítejte s tím, že se můžete dožít vysokého věku — a dostanete jediné číslo, pro které sem kdokoli přišel: kolik si můžete každý rok dovolit utrácet, v dnešních penězích, po zbytek života. Posuňte rok, kdy přestanete pracovat, a podívejte se, co udělá pár let práce navíc.',
+  tour4Fig: '{m} měsíčně, doživotně',
+
+  tour5T: 'Jediné aktivum, které nejde rozložit',
+  tour5B: 'Úspory rozložíte mezi tisíc firem během jednoho odpoledne. Portfolio kariér držet nejde. Pokud jsou vaše příjmy to nejcennější, co máte, pak největší riziko na vaší rozvaze není propad trhů — je to, že příjmy skončí. Přesně na to je pojištění příjmu, a kolik se ho vyplatí koupit, vychází z vaší vlastní rozvahy, ne z pravidla palce.',
+  tour5Fig: 'Vyplatí se koupit: {c}',
+
   scenSummary: 'Porovnat dva plány',
   scenSummaryN: 'Porovnat dva plány (uloženo: {n})',
   scenNamePh: 'Pojmenujte plán a uložte ho',

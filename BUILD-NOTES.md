@@ -163,6 +163,21 @@ Sanity check from the test suite: with equivalence-scaled essentials a couple ge
   pay with a real mortgage. The UK default has £8,092/year of discretionary spending,
   which is sobering and correct.
 
+## The walkthrough
+
+Five steps, one idea and one control each. It drives the live state rather than a mock, so
+the charts below move as the reader moves the slider — the point being that the reader is
+playing with the model, not watching an animation of it. The state is borrowed: the
+walkthrough snapshots it on entry and ends with *keep these numbers* or *put my plan back*,
+and anything that replaces the whole plan (Reset, opening a saved one) closes it first so
+the snapshot cannot undo a later decision.
+
+Building it exposed a real gap. Sliders and segmented controls repaint on every render, but
+the two number fields never did, because until now nothing outside them could change their
+value. The walkthrough changes age from a different control, so the rail would have shown a
+stale age next to a moving answer — the same "the control looks dead" defect the first audit
+round was about. Both field types now repaint, and the field under the cursor is left alone.
+
 ## Comparing two plans
 
 Saved plans live in `localStorage`, keyed by country, and hold a whole state rather than a
