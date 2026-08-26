@@ -693,6 +693,47 @@ function assetMix(eq, glob) {
     return a.global ? eq * glob * a.w / globSum : eq * (1 - glob) * a.w / (stockSum - globSum);
   });
 }
+/**
+ * What the risk-free rate implies for shares and bonds, in real terms.
+ *
+ * The model never takes an expected return as an input. It takes a covariance
+ * matrix and a risk-free rate, and derives every expected return from them
+ * through the stochastic discount factor — which is why "what return does this
+ * assume?" has no answer anywhere in the inputs. This computes it, so the single
+ * most consequential assumption in the tool can be stated rather than implied.
+ *
+ * `eq` and `bond` are ARITHMETIC expected real returns; `eqGeo` is the
+ * geometric equivalent, which is the one that compounds and the one a saver
+ * actually experiences. Both are quoted gross of fees.
+ */
+function impliedReturns(rf) {
+  const { sigmaSDF } = deriveCMA(0.2, globalStockFraction(), 0.15, globalStockFraction(), rf);
+  const wStock = stockPortfolio();
+  const bondTot = ASSET_CLASSES.reduce((a, x) => a + (x.equity ? 0 : x.w), 0);
+  const wBond = ASSET_CLASSES.map(x => (x.equity || bondTot <= 0) ? 0 : x.w / bondTot);
+  const cov = (w) => {
+    let s = 0;
+    for (let i = 0; i < w.length; i++) for (let j = 0; j < wStock.length; j++) s += w[i] * wStock[j] * COV_MAT[i][j];
+    return s;
+  };
+  const varOf = (w) => {
+    let s = 0;
+    for (let i = 0; i < w.length; i++) for (let j = 0; j < w.length; j++) s += w[i] * w[j] * COV_MAT[i][j];
+    return s;
+  };
+  const eq = erCovS(cov(wStock), rf, sigmaSDF);
+  const bond = erCovS(cov(wBond), rf, sigmaSDF);
+  const varEq = varOf(wStock);
+  return {
+    eq, bond, sdEq: Math.sqrt(varEq),
+    // The drag from volatility: what compounds is below the average.
+    eqGeo: eq - 0.5 * varEq,
+    // The most anyone can be paid for taking risk here — the SDF volatility is
+    // the Hansen-Jagannathan bound on the Sharpe ratio.
+    maxSharpe: sigmaSDF,
+  };
+}
+
 function globalStockFraction() {
   let s = 0, g = 0;
   for (const a of ASSET_CLASSES) if (a.equity) { s += a.w; if (a.global) g += a.w; }
@@ -1516,7 +1557,12 @@ const UK = {
   salaryCurve: makeSalaryCurve('UK'),
   medianSalary: 39039,
   avgWage: 39039,
-  rf: 0.015,                 // real risk-free rate, index-linked gilts ~1.5%
+  /* Real risk-free rate. Directly observable in the UK: the 10-year
+     index-linked gilt benchmark yielded 1.68% real in June 2026. Linkers pay
+     RPI and this model works in CPI terms, so the CPI-real yield is higher by
+     the RPI-CPI wedge, which the 2030 alignment of RPI to CPIH shrinks over the
+     horizon. 1.75% is that, rounded down. Editable. */
+  rf: 0.0175,
   defaultFee: 0.005,         // workplace default fund; DIY passive is nearer 0.30%
   pensionAgeFor: ukStatePensionAge,
   minPrivatePensionAge: 57,  // rises from 55 to 57 in April 2028
@@ -1646,7 +1692,11 @@ const CZ = {
   salaryCurve: makeSalaryCurve('CZ'),
   medianSalary: 43241 * 12,
   avgWage: CZ_AVG_WAGE_M * 12,
-  rf: 0.015,
+  /* No CZK index-linked market exists, so this is derived rather than read:
+     the 10-year government yield was around 4.9% in 2026 against the CNB's 2%
+     target, less roughly half a point of inflation risk premium. Weaker
+     evidence than the UK figure and it is set out as such on screen. Editable. */
+  rf: 0.0225,
   defaultFee: 0.015,          // bank-distributed podílové fondy run ~2% TER; ETFs far less
   pensionAgeFor: czRetirementAge,
   minPrivatePensionAge: 60,   // DPS payout normally from 60
@@ -1803,6 +1853,9 @@ en: {
   jobRiskNoteLow: 'That is a large bond you already own, which is why shares belong in your savings.',
   jobRiskNoteHigh: 'You already carry equity risk through your job, so your savings should carry less.',
   printBlocked: 'Use Ctrl+P',
+  rfImplied: 'Nothing here asks what return to expect: the model derives it from how the assets move together and from this rate. At the rate above it implies about <b>{eq}</b> a year on shares in real terms with a spread of {sd} — which compounds to <b>{geo}</b>, the figure a saver actually lives with — and about <b>{bond}</b> on bonds. Gross of your charges, and assumptions rather than forecasts.',
+  rfSourceUK: 'Default: the 10-year index-linked gilt yielded 1.68% real in June 2026, rounded down to 1.75% after the RPI-to-CPIH alignment.',
+  rfSourceCZ: 'Default: no Czech index-linked market exists, so this is derived — a 10-year government yield near 4.9% in 2026 against the CNB’s 2% target, less about half a point of inflation risk premium. Weaker evidence than the UK figure.',
   tourStart: 'The idea',
   tourOf: 'The idea · {i} of {n}',
   tourNext: 'Next', tourBack: 'Back', tourClose: 'Close',
@@ -2035,6 +2088,9 @@ cs: {
   jobRiskNoteLow: 'To je velký dluhopis, který už vlastníte — proto do úspor patří akcie.',
   jobRiskNoteHigh: 'Akciové riziko už nesete v práci, takže vaše úspory ho mají nést méně.',
   printBlocked: 'Použijte Ctrl+P',
+  rfImplied: 'Nikde se tu neptáme, jaký výnos očekávat: model si ho odvodí z toho, jak se aktiva pohybují spolu, a z této sazby. Při sazbě výše to znamená zhruba <b>{eq}</b> ročně na akciích reálně s rozptylem {sd} — což se složí na <b>{geo}</b>, tedy na číslo, se kterým spořitel doopravdy žije — a asi <b>{bond}</b> na dluhopisech. Před vašimi poplatky, a jsou to předpoklady, ne předpovědi.',
+  rfSourceUK: 'Výchozí hodnota: desetiletý britský indexovaný dluhopis nesl v červnu 2026 reálně 1,68 %, zaokrouhleno dolů na 1,75 %.',
+  rfSourceCZ: 'Výchozí hodnota: český trh s indexovanými dluhopisy neexistuje, takže je odvozená — desetiletý státní dluhopis kolem 4,9 % v roce 2026 proti dvouprocentnímu cíli ČNB, minus zhruba půl bodu prémie za inflační riziko. Slabší podklad než u britského čísla.',
   tourStart: 'O co jde',
   tourOf: 'O co jde · {i} z {n}',
   tourNext: 'Dál', tourBack: 'Zpět', tourClose: 'Zavřít',
@@ -2645,6 +2701,18 @@ function buildRail() {
       fieldNum(T.rf, ()=>Math.round(S.rf*1000)/10, v=>S.rf=v/100, -2, 8, 0.1, '%'),
       fieldNum(T.horizon, ()=>S.maxAge, v=>S.maxAge=Math.max(70,Math.min(115,v)), 70, 115, 1),
     ]),
+    (() => {
+      /* A readout rather than a hint: it has to move when the rate moves. */
+      const box = el('div', { class:'field readout' });
+      box._update = () => {
+        const r = impliedReturns(S.rf);
+        box.innerHTML = fill(T.rfImplied, {
+          eq: pct(r.eq, 1), geo: pct(r.eqGeo, 1), sd: pct(r.sdEq, 0), bond: pct(r.bond, 1),
+        }) + '<br><span style="opacity:.85">' + T[BUILD.country === 'CZ' ? 'rfSourceCZ' : 'rfSourceUK'] + '</span>';
+      };
+      box._update();
+      return box;
+    })(),
     /* The insurer's margin lives here rather than in the insurance panel: it
        decides the answer, but asking a normal person for it produces a guess
        dressed as an input. Estimated by occupation, visible and overridable. */

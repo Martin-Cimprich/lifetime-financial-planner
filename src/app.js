@@ -399,6 +399,18 @@ function buildRail() {
       fieldNum(T.rf, ()=>Math.round(S.rf*1000)/10, v=>S.rf=v/100, -2, 8, 0.1, '%'),
       fieldNum(T.horizon, ()=>S.maxAge, v=>S.maxAge=Math.max(70,Math.min(115,v)), 70, 115, 1),
     ]),
+    (() => {
+      /* A readout rather than a hint: it has to move when the rate moves. */
+      const box = el('div', { class:'field readout' });
+      box._update = () => {
+        const r = impliedReturns(S.rf);
+        box.innerHTML = fill(T.rfImplied, {
+          eq: pct(r.eq, 1), geo: pct(r.eqGeo, 1), sd: pct(r.sdEq, 0), bond: pct(r.bond, 1),
+        }) + '<br><span style="opacity:.85">' + T[BUILD.country === 'CZ' ? 'rfSourceCZ' : 'rfSourceUK'] + '</span>';
+      };
+      box._update();
+      return box;
+    })(),
     /* The insurer's margin lives here rather than in the insurance panel: it
        decides the answer, but asking a normal person for it produces a guess
        dressed as an input. Estimated by occupation, visible and overridable. */

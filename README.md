@@ -129,6 +129,19 @@ published output.
 | UK earnings | ONS ASHE 2025 | cubic fit within ±1.5%, peak at 40–49 as published |
 | CZ earnings | ISPV 2025 | cubic fit within ±1.5%, peak at 30–39 as published |
 
+The one number that cannot be validated this way is the **real risk-free rate**, because
+there is no published output to reproduce — it is an assumption about the future, not a
+transcribed fact. It is sourced as far as it can be, stated on screen with its derivation,
+and editable:
+
+- **UK, 1.75%.** Directly observable. The 10-year index-linked gilt benchmark yielded 1.68%
+  real in June 2026. Linkers pay RPI and this model works in CPI terms, so the CPI-real
+  figure is higher by the RPI–CPI wedge, which the 2030 alignment of RPI to CPIH closes over
+  the horizon. 1.75% is that, rounded down.
+- **CZ, 2.25%.** Derived, because no CZK index-linked market exists: a 10-year government
+  yield near 4.9% in 2026 against the ČNB's 2% target, less roughly half a point of
+  inflation risk premium. Weaker evidence than the UK figure, and the tool says so on screen.
+
 The two state pensions are structurally opposite, which is why a shared model would be a
 lie: the UK's is flat-rate and cannot be taken early at any age; Czechia's is
 earnings-related but so redistributive that nothing accrues above four times the average
@@ -204,10 +217,35 @@ birth cohorts, and one in the build script that would have shipped every other f
 no-op. All are fixed and covered by regression tests. [AUDIT.md](AUDIT.md) records what was
 found, how it was demonstrated, and what changed as a result.
 
+## What the model assumes about returns
+
+Nothing in the inputs asks what return to expect, which made this the one large assumption
+nobody could see. The model takes a covariance matrix over nine asset classes and a real
+risk-free rate, and **derives** every expected return from them through the stochastic
+discount factor. The interface now states the result next to the rate it comes from: at the
+UK default, about **4.2% a year on shares in real terms**, which compounds to **2.9%** once
+the volatility drag is taken off, against **2.0% on bonds** — gross of charges.
+
+That is a conservative view. The implied equity risk premium is 2.4 percentage points, and
+the most the model will pay anyone for taking risk is a Sharpe ratio of 0.15 — both well
+below the long-run historical record. It is Idzorek and Kaplan's construction, faithfully
+reproduced, and it is now a sentence on screen rather than a number buried in a covariance
+matrix.
+
+The covariance matrix itself is **not** localised, and will not be until there is something
+to localise it from: a Czech-specific one would be invented rather than sourced. The tool
+already assumes everyone holds the same globally diversified portfolio, so what ought to
+differ between the two countries is the risk-free rate, not the covariances.
+
+The rate matters more than it looks. Patience is elicited as a spending *shape* and inverted
+through the Euler equation, so the risk-free rate resets the implied impatience as well as
+the discounting, and the two effects push the same way rather than cancelling. A percentage
+point on the rate moves the UK default household's spending by about 13%. Moving the UK
+default from 1.5% to a sourced 1.75% raised it 3.4%; moving the Czech default from 1.5% to
+2.25% raised it 6.5%.
+
 ## Known limits
 
-No children, no divorce, no redundancy, no long-term care. Investment return assumptions
-are still the original US-centric capital market assumptions — mortality, tax, pension and
-earnings are localised, expected returns are not. Tax bands are frozen in real terms, so
+No children, no divorce, no redundancy, no long-term care. Tax bands are frozen in real terms, so
 long projections understate fiscal drag. UK figures use England/Wales/NI rates; Scotland
 differs and the tool says so on screen.

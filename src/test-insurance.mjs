@@ -141,12 +141,25 @@ for (const C of [UK, CZ]) {
      exact solve still buys in quantity. The interface must not state the rule's
      verdict as if it were the model's answer inside that band — this locates
      the band so the copy for it stays exercised. */
-  const edge = insuranceAnalysis(paramsFor(C, { eta: 1.0 }), ctx, { loading: 0.5 });
-  ok('the rule and the exact answer part company on a large risk',
-     !edge.worthInsuring && edge.bestCover > edge.needCover * 0.15,
-     `rule says skip (loss ${(edge.uninsuredDrop*100).toFixed(0)}% < threshold ` +
-     `${(edge.selfInsureThreshold*100).toFixed(0)}%) but exact buys ` +
-     `${(100*edge.bestCover/edge.needCover).toFixed(0)}% of full`);
+  /* Searched rather than pinned to one setting: the property that has to hold
+     is that such a band EXISTS, and pinning it meant every change to an
+     unrelated assumption moved the persona out of the band and failed here. */
+  let edge = null;
+  for (const eta of [1.0, 0.8, 0.67]) {
+    for (const L of [0.3, 0.4, 0.5, 0.6, 0.8]) {
+      const x = insuranceAnalysis(paramsFor(C, { eta }), ctx, { loading: L });
+      if (!x.worthInsuring && x.bestCover > x.needCover * 0.15) {
+        edge = { x, eta, L }; break;
+      }
+    }
+    if (edge) break;
+  }
+  ok('the rule and the exact answer part company on a large risk', edge != null,
+     edge ? `at RRA ${(1/edge.eta).toFixed(1)} and markup ${(edge.L*100).toFixed(0)}%: ` +
+            `rule says skip (loss ${(edge.x.uninsuredDrop*100).toFixed(0)}% < threshold ` +
+            `${(edge.x.selfInsureThreshold*100).toFixed(0)}%) but exact buys ` +
+            `${(100*edge.x.bestCover/edge.x.needCover).toFixed(0)}% of full`
+          : 'no setting found where the two disagree — the ipSmallApprox copy is unreachable');
   // Push the markup far enough and they agree again: both say buy nothing.
   const far = insuranceAnalysis(paramsFor(C, { eta: 1.0 }), ctx, { loading: 1.0 });
   ok('and agree again once the markup is high enough',

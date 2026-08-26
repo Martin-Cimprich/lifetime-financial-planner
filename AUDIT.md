@@ -277,3 +277,51 @@ aligned with what the application actually does.
 No headline spending figure moved anywhere. With the exception of the couples fix, every one
 of these was a defect in what the tool *said* rather than in what it computed — which is the
 pattern of all three rounds.
+
+
+---
+
+# Round four — the assumption nobody could see
+
+**Seven checks in `test-countries.mjs` printed FAIL and passed the build.** They were written
+as inline `console.log` with a ternary rather than through the suite's counter, so the state
+pension ages for three UK birth cohorts, three Czech retirement ages and the monotonicity of
+the risk mapping could all have broken silently while the suite exited 0. A test that reports
+a failure and then reports success is worse than no test at all. Converted to a counted
+`ok()`, like every other suite here.
+
+**The expected return on shares was nowhere in the interface, and nowhere in the inputs
+either.** The model never takes a return as an input: it takes a covariance matrix over nine
+asset classes and a real risk-free rate, and derives every expected return from them through
+the stochastic discount factor. So the honest answer to "what return does this assume?" was
+that nobody could tell you without reading the engine. Worked out, at the UK default it is
+**4.2% a year on shares in real terms, 2.9% after the volatility drag, against 2.0% on
+bonds** — an equity risk premium of 2.4 percentage points and a maximum Sharpe ratio of 0.15,
+both well below the historical record. That is Idzorek and Kaplan's construction and it is
+faithfully reproduced; the defect was that it was invisible. `impliedReturns()` computes it
+and the assumptions panel states it beside the rate it comes from.
+
+**The real risk-free rate was 1.5% in both countries, sourced from nothing.** It is now 1.75%
+in the UK, read off the 10-year index-linked gilt (1.68% real in June 2026, rounded down for
+the RPI-to-CPIH alignment), and 2.25% in Czechia, derived from a 10-year government yield near
+4.9% against the ČNB's 2% target less an inflation risk premium. The Czech figure is weaker
+evidence and the tool says so rather than presenting the two as equally solid.
+
+**And the rate turns out to matter much more than a first look suggests.** A quick sensitivity
+run holding the preference parameters fixed said a percentage point on the rate moved spending
+by about 1%, which would have made the whole question unimportant. That run was wrong, because
+the interface does not hold the preference parameters fixed: patience is elicited as a
+spending *shape* and inverted through the Euler equation, so the rate resets the implied
+impatience as well as the discounting, and the two push the same way instead of cancelling.
+Measured through the actual application pipeline it is about **13% per percentage point**.
+Worth recording as a caution about testing the engine in isolation from the layer that feeds
+it.
+
+| | before | after |
+|---|---|---|
+| UK real risk-free rate | 1.5%, unsourced | 1.75%, from the June 2026 linker |
+| CZ real risk-free rate | 1.5%, unsourced | 2.25%, derived from the ČNB target |
+| UK default household, spending | £8,298/yr | £8,577/yr |
+| CZ default household, spending | 59,295 Kč/yr | 63,154 Kč/yr |
+| implied real return on shares | not stated anywhere | stated on screen, 4.2% (UK) |
+| `test-countries.mjs` | 7 checks could fail silently | all counted |

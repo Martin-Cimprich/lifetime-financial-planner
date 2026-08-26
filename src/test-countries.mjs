@@ -1,9 +1,14 @@
 /* Validate the country modules against the published worked examples. */
+import { impliedReturns } from './engine.mjs';
 import { UK, CZ, ukIncomeTax, ukNI, czIncomeTax, czSocialHealth, czStatePension,
          czRetirementAge, ukStatePensionAge, ukStatePension,
          riskAversionFromGamble, thetaFromRiskAversion } from './countries.mjs';
 
 let fail = 0;
+const ok = (name, cond, detail) => {
+  if (!cond) fail++;
+  console.log(`  ${cond ? 'OK  ' : 'FAIL'}  ${name}${detail ? '  — ' + detail : ''}`);
+};
 const near = (name, got, want, tol, unit) => {
   const ok = Math.abs(got - want) <= tol;
   if (!ok) fail++;
@@ -36,9 +41,9 @@ near('below 10 years pays nothing',
 near('flat-rate: a high earner gets the same',
   ukStatePension({ workUntilAge: 67, niYears: 35 }),
   ukStatePension({ workUntilAge: 67, niYears: 35 }), 0);
-console.log(`  ${ukStatePensionAge(1959)===66?'OK  ':'FAIL'}  SPA 66 for born 1959`);
-console.log(`  ${ukStatePensionAge(1970)===67?'OK  ':'FAIL'}  SPA 67 for born 1970`);
-console.log(`  ${ukStatePensionAge(1990)===68?'OK  ':'FAIL'}  SPA 68 for born 1990`);
+ok('SPA 66 for born 1959', ukStatePensionAge(1959) === 66);
+ok('SPA 67 for born 1970', ukStatePensionAge(1970) === 67);
+ok('SPA 68 for born 1990', ukStatePensionAge(1990) === 68);
 if (ukStatePensionAge(1959)!==66||ukStatePensionAge(1970)!==67||ukStatePensionAge(1990)!==68) fail++;
 
 console.log('\n=== CZ daň + pojištění vs published worked examples (2026) ===\n');
@@ -66,9 +71,10 @@ for (const [mult, wantMonthly] of [
 }
 const capped = czStatePension({ insuredYears: 45, workUntilAge: 65 }, 48967 * 8) / 12;
 near('nothing accrues above 4x average wage', capped, 49743, 15, 'CZK/mo');
-console.log(`  ${czRetirementAge(1960)===65?'OK  ':'FAIL'}  retirement age 65 for born 1960`);
-console.log(`  ${Math.abs(czRetirementAge(1975)-65.833)<0.01?'OK  ':'FAIL'}  65y10m for born 1975 (got ${czRetirementAge(1975).toFixed(3)})`);
-console.log(`  ${czRetirementAge(1995)===67?'OK  ':'FAIL'}  capped at 67 for born 1995`);
+ok('retirement age 65 for born 1960', czRetirementAge(1960) === 65);
+ok('65y10m for born 1975', Math.abs(czRetirementAge(1975) - 65.833) < 0.01,
+   czRetirementAge(1975).toFixed(3));
+ok('capped at 67 for born 1995', czRetirementAge(1995) === 67);
 if (czRetirementAge(1960)!==65 || Math.abs(czRetirementAge(1975)-65.833)>=0.01 || czRetirementAge(1995)!==67) fail++;
 
 console.log('\n=== Risk aversion from the 50/50 gamble ===\n');
@@ -86,7 +92,7 @@ for (const pi of Object.keys(WANT).map(Number)) {
   prev = g;
   near(`gamma at pi=${(pi*100).toFixed(1)}%`, g, WANT[pi], 0.03, `-> theta ${th.toFixed(3)}`);
 }
-console.log(`  ${mono?'OK  ':'FAIL'}  mapping is monotone in willingness to pay`);
+ok('mapping is monotone in willingness to pay', mono);
 if (!mono) fail++;
 // The model's default theta = 0.6 should correspond to a plausible gamma
 const gDefault = 1 / 0.6;
@@ -100,6 +106,47 @@ for (const C of [UK, CZ]) {
     [25,35,45,55,65].map((a,i)=>`${a}y ${vals[i].toFixed(2)}`).join('  '));
   const peak = (() => { let best=0,ba=0; for(let a=22;a<=70;a++){const v=C.salaryCurve(a,person); if(v>best){best=v;ba=a;}} return ba; })();
   console.log(`     fitted peak age ${peak}`);
+}
+
+/* --- what the risk-free rate implies -----------------------------------
+   The interface now states these on screen, so they are assertions rather
+   than curiosities. They are also the only place the tool says anything at
+   all about expected returns. */
+console.log('\n=== Implied real returns ===\n');
+for (const C of [UK, CZ]) {
+  const r = impliedReturns(C.rf);
+  console.log(`  ${C.code}  rf ${(C.rf*100).toFixed(2)}%  ->  shares ${(r.eq*100).toFixed(2)}% ` +
+    `arithmetic, ${(r.eqGeo*100).toFixed(2)}% geometric, sd ${(r.sdEq*100).toFixed(1)}%; ` +
+    `bonds ${(r.bond*100).toFixed(2)}%`);
+  ok(`${C.code} implied equity return is above the risk-free rate`, r.eq > C.rf + 0.01,
+     `premium ${((r.eq - C.rf)*100).toFixed(2)}pp`);
+  ok(`${C.code} implied equity return is not a fantasy`, r.eq > 0.02 && r.eq < 0.09,
+     `${(r.eq*100).toFixed(2)}% real, arithmetic`);
+  ok(`${C.code} bonds sit between cash and shares`, r.bond > C.rf && r.bond < r.eq,
+     `${(C.rf*100).toFixed(2)}% < ${(r.bond*100).toFixed(2)}% < ${(r.eq*100).toFixed(2)}%`);
+  ok(`${C.code} volatility drag is applied the right way`, r.eqGeo < r.eq,
+     `${(r.eqGeo*100).toFixed(2)}% compounds vs ${(r.eq*100).toFixed(2)}% average`);
+  ok(`${C.code} equity volatility is plausible for a global portfolio`,
+     r.sdEq > 0.12 && r.sdEq < 0.22, `${(r.sdEq*100).toFixed(1)}%`);
+}
+/* Raising the risk-free rate must raise every expected return with it: they are
+   all derived from it, so anything else would mean the derivation is inverted. */
+{
+  let mono = true;
+  let prevEq = -1, prevB = -1;
+  for (const rf of [0.005, 0.01, 0.015, 0.02, 0.025, 0.03]) {
+    const r = impliedReturns(rf);
+    if (r.eq <= prevEq || r.bond <= prevB) mono = false;
+    prevEq = r.eq; prevB = r.bond;
+  }
+  ok('every implied return rises with the risk-free rate', mono);
+  /* The Sharpe ratio the model can pay is the volatility of the stochastic
+     discount factor, and it is a property of the covariance matrix rather than
+     of the rate — worth pinning, because it is the assumption that decides how
+     much anyone is paid for taking risk here. */
+  const s = impliedReturns(0.0175).maxSharpe;
+  ok('the most the model pays for risk is a Sharpe ratio near 0.15',
+     Math.abs(s - 0.153) < 0.005, s.toFixed(4));
 }
 
 console.log(fail === 0 ? '\n*** ALL COUNTRY CHECKS PASSED ***' : `\n*** ${fail} CHECK(S) FAILED ***`);

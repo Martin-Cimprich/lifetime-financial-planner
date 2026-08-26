@@ -103,6 +103,47 @@ function assetMix(eq, glob) {
     return a.global ? eq * glob * a.w / globSum : eq * (1 - glob) * a.w / (stockSum - globSum);
   });
 }
+/**
+ * What the risk-free rate implies for shares and bonds, in real terms.
+ *
+ * The model never takes an expected return as an input. It takes a covariance
+ * matrix and a risk-free rate, and derives every expected return from them
+ * through the stochastic discount factor — which is why "what return does this
+ * assume?" has no answer anywhere in the inputs. This computes it, so the single
+ * most consequential assumption in the tool can be stated rather than implied.
+ *
+ * `eq` and `bond` are ARITHMETIC expected real returns; `eqGeo` is the
+ * geometric equivalent, which is the one that compounds and the one a saver
+ * actually experiences. Both are quoted gross of fees.
+ */
+export function impliedReturns(rf) {
+  const { sigmaSDF } = deriveCMA(0.2, globalStockFraction(), 0.15, globalStockFraction(), rf);
+  const wStock = stockPortfolio();
+  const bondTot = ASSET_CLASSES.reduce((a, x) => a + (x.equity ? 0 : x.w), 0);
+  const wBond = ASSET_CLASSES.map(x => (x.equity || bondTot <= 0) ? 0 : x.w / bondTot);
+  const cov = (w) => {
+    let s = 0;
+    for (let i = 0; i < w.length; i++) for (let j = 0; j < wStock.length; j++) s += w[i] * wStock[j] * COV_MAT[i][j];
+    return s;
+  };
+  const varOf = (w) => {
+    let s = 0;
+    for (let i = 0; i < w.length; i++) for (let j = 0; j < w.length; j++) s += w[i] * w[j] * COV_MAT[i][j];
+    return s;
+  };
+  const eq = erCovS(cov(wStock), rf, sigmaSDF);
+  const bond = erCovS(cov(wBond), rf, sigmaSDF);
+  const varEq = varOf(wStock);
+  return {
+    eq, bond, sdEq: Math.sqrt(varEq),
+    // The drag from volatility: what compounds is below the average.
+    eqGeo: eq - 0.5 * varEq,
+    // The most anyone can be paid for taking risk here — the SDF volatility is
+    // the Hansen-Jagannathan bound on the Sharpe ratio.
+    maxSharpe: sigmaSDF,
+  };
+}
+
 export function globalStockFraction() {
   let s = 0, g = 0;
   for (const a of ASSET_CLASSES) if (a.equity) { s += a.w; if (a.global) g += a.w; }

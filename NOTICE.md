@@ -87,6 +87,14 @@ data:
   tax year 2025/26.
 - **MPSV, ČSSZ, Finanční správa ČR** — Czech tax, social and health insurance, and
   starobní důchod parameters, 2026.
+- **UK gilt market data** — 10-year index-linked gilt real yield, June 2026, used for the
+  UK real risk-free rate default.
+- **Czech National Bank** — 10-year government bond yield and the 2% inflation target, 2026,
+  used to derive the Czech real risk-free rate default.
+
+The real risk-free rate is the only figure in the tool that is an assumption about the future
+rather than a transcription of a published fact. It is stated on screen together with its
+derivation and what it implies for returns, and it is editable.
 
 ## Disclaimer
 

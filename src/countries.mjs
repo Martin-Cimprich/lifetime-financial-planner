@@ -113,7 +113,12 @@ export const UK = {
   salaryCurve: makeSalaryCurve('UK'),
   medianSalary: 39039,
   avgWage: 39039,
-  rf: 0.015,                 // real risk-free rate, index-linked gilts ~1.5%
+  /* Real risk-free rate. Directly observable in the UK: the 10-year
+     index-linked gilt benchmark yielded 1.68% real in June 2026. Linkers pay
+     RPI and this model works in CPI terms, so the CPI-real yield is higher by
+     the RPI-CPI wedge, which the 2030 alignment of RPI to CPIH shrinks over the
+     horizon. 1.75% is that, rounded down. Editable. */
+  rf: 0.0175,
   defaultFee: 0.005,         // workplace default fund; DIY passive is nearer 0.30%
   pensionAgeFor: ukStatePensionAge,
   minPrivatePensionAge: 57,  // rises from 55 to 57 in April 2028
@@ -243,7 +248,11 @@ export const CZ = {
   salaryCurve: makeSalaryCurve('CZ'),
   medianSalary: 43241 * 12,
   avgWage: CZ_AVG_WAGE_M * 12,
-  rf: 0.015,
+  /* No CZK index-linked market exists, so this is derived rather than read:
+     the 10-year government yield was around 4.9% in 2026 against the CNB's 2%
+     target, less roughly half a point of inflation risk premium. Weaker
+     evidence than the UK figure and it is set out as such on screen. Editable. */
+  rf: 0.0225,
   defaultFee: 0.015,          // bank-distributed podílové fondy run ~2% TER; ETFs far less
   pensionAgeFor: czRetirementAge,
   minPrivatePensionAge: 60,   // DPS payout normally from 60
