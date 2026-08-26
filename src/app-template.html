@@ -135,6 +135,34 @@ input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;bac
 .stat .v{font-family:var(--serif);font-size:26px;font-weight:600;line-height:1.15;margin-top:3px;
   font-variant-numeric:tabular-nums;letter-spacing:-.015em}
 .stat .n{font-size:11.5px;color:var(--ink-2);margin-top:3px}
+.stat .delta{font-size:11.5px;margin-top:4px;font-weight:600}
+.stat .delta.up{color:var(--good)} .stat .delta.dn{color:var(--crit)}
+.stat .delta.flat{color:var(--ink-3);font-weight:500}
+.scenbar{margin-bottom:16px}
+.scenbar details{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+.scenbar summary{cursor:pointer;padding:9px 14px;font-size:12.5px;font-weight:550;
+  color:var(--teal);list-style:none}
+.scenbar summary::-webkit-details-marker{display:none}
+.scenbar summary::before{content:"▸ "}
+.scenbar details[open] summary::before{content:"▾ "}
+.scenbar .sinner{padding:2px 14px 14px}
+.scenbar .srow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.scenbar input{font:inherit;font-size:13px;padding:6px 9px;background:var(--surface);
+  color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-sm);min-width:190px}
+.scenbar .sbtn{font:inherit;font-size:12.5px;padding:6px 11px;cursor:pointer;
+  background:var(--surface);color:var(--ink);border:1px solid var(--line);
+  border-radius:var(--radius-sm)}
+.scenbar .sbtn:hover{border-color:var(--teal)}
+.scenbar .chip{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;
+  background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px 5px 4px 12px}
+.scenbar .chip.on{border-color:var(--teal);box-shadow:inset 0 0 0 1px var(--teal)}
+.scenbar .chip .nm{font-weight:600}
+.scenbar .chip .fig{color:var(--ink-3)}
+.scenbar .chip button{font:inherit;font-size:11.5px;padding:2px 8px;cursor:pointer;
+  background:transparent;color:var(--ink-2);border:1px solid var(--line);border-radius:999px}
+.scenbar .chip button:hover{border-color:var(--teal);color:var(--teal)}
+.scenbar .chip button.x{border:0;font-size:14px;line-height:1;padding:2px 6px;color:var(--ink-3)}
+.scenbar .shint{font-size:11.5px;color:var(--ink-3);margin-top:7px;max-width:70ch}
 .stat.hero{grid-column:1/-1;background:var(--teal-soft);border-color:var(--teal)}
 .stat.hero .v{font-size:40px;color:var(--teal)}
 .stat.hero .k{color:var(--ink-2);font-size:12.5px}
@@ -242,6 +270,7 @@ footer p{margin:0 0 7px;max-width:90ch}
   <main>
     <div class="printonly" id="printhead"></div>
     <div class="headline" id="headline"></div>
+    <div class="scenbar noprint" id="scenbar"></div>
     <div class="alerts" id="alerts"></div>
 
     <section class="panel">

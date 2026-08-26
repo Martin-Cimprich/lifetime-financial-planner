@@ -60,8 +60,8 @@ const fill = (s, o) => s.replace(/\{(\w+)\}/g, (_,k)=> o[k] != null ? o[k] : '')
 /* -------------------------------------------------- preference conversion */
 /* The interface asks questions people can answer about themselves; these turn
    the answers into the model's parameters. */
-function thetaFromAnswer() {
-  const gamma = riskAversionFromGamble(S.riskPay);
+function thetaFromAnswer(st = S) {
+  const gamma = riskAversionFromGamble(st.riskPay);
   return Math.max(0.03, Math.min(3, thetaFromRiskAversion(gamma)));
 }
 const ETA_BY_SMOOTH = [0.25, 0.5, 1.0];          // steadier spending = lower EIS
@@ -76,14 +76,14 @@ const EQ_HC_BY_JOB = [0.05, 0.15, 0.30, 0.50];
 const PHI_BY_WEIGHT = [0.02, 0.08, 0.20];
 /* The spending-shape answer is inverted through the Euler equation. Real
    spending grows at g = ((1+h)/(1+rho))^eta - 1, so a chosen slope implies rho. */
-function rhoFromShape(h, eta) {
-  const target = [-0.010, 0.0, 0.010][S.shape];   // real change per year
+function rhoFromShape(h, eta, st = S) {
+  const target = [-0.010, 0.0, 0.010][st.shape];  // real change per year
   const rho = (1 + h) / Math.pow(1 + target, 1 / eta) - 1;
   return Math.max(-0.02, Math.min(0.25, rho));
 }
 
-function buildParams() {
-  const people = (S.couple ? S.people : [S.people[0]]).map(p => ({
+function buildParams(st = S) {
+  const people = (st.couple ? st.people : [st.people[0]]).map(p => ({
     age: p.age, sex: p.sex,
     healthShift: [-4, 0, 3, 7][p.health],
     trajectory: [0.4, 1, 1.6][p.trajectory],
@@ -100,36 +100,36 @@ function buildParams() {
     existingCover: Math.max(0, p.existingCover || 0),
     birthYear: CY - p.age,
   }));
-  const theta = thetaFromAnswer();
-  const eta = ETA_BY_SMOOTH[S.smooth];
-  const cma = deriveCMA(0.2, globalStockFraction(), 0.15, globalStockFraction(), S.rf);
+  const theta = thetaFromAnswer(st);
+  const eta = ETA_BY_SMOOTH[st.smooth];
+  const cma = deriveCMA(0.2, globalStockFraction(), 0.15, globalStockFraction(), st.rf);
   const hGross = theta === 1
-    ? (1 + S.rf) * Math.exp(0.5 * cma.sigmaSDF ** 2) - 1
-    : Math.pow(Math.pow(1 + S.rf, theta - 1) * Math.exp(0.5 * theta * (theta - 1) * cma.sigmaSDF ** 2),
+    ? (1 + st.rf) * Math.exp(0.5 * cma.sigmaSDF ** 2) - 1
+    : Math.pow(Math.pow(1 + st.rf, theta - 1) * Math.exp(0.5 * theta * (theta - 1) * cma.sigmaSDF ** 2),
                1 / (theta - 1)) - 1;
-  const h = hGross - S.fee;
+  const h = hGross - st.fee;
   return {
-    people, cbar: S.cbar,
-    savings: { shares: S.savings.shares, bonds: S.savings.bonds,
-               cash: S.savings.cash, pension: S.savings.pension },
-    housing: S.own ? {
-      own: true, value: S.homeValue, mortgageBalance: S.mortgageBalance,
-      mortgageRate: S.mortgageRate, mortgageYearsLeft: S.mortgageYears,
-      downsizeAge: S.downsize ? S.downsizeAge : 0,
-      downsizeRelease: S.downsize ? S.downsizeRelease : 0,
+    people, cbar: st.cbar,
+    savings: { shares: st.savings.shares, bonds: st.savings.bonds,
+               cash: st.savings.cash, pension: st.savings.pension },
+    housing: st.own ? {
+      own: true, value: st.homeValue, mortgageBalance: st.mortgageBalance,
+      mortgageRate: st.mortgageRate, mortgageYearsLeft: st.mortgageYears,
+      downsizeAge: st.downsize ? st.downsizeAge : 0,
+      downsizeRelease: st.downsize ? st.downsizeRelease : 0,
     } : { own: false },
-    maxAge: S.maxAge, curYear: CY,
-    theta, eta, rho: rhoFromShape(h, eta), alpha: S.alpha,
-    beqMode: S.beqMode, beqFixed: S.beqFixed, gamma: 0.25,
-    phi: PHI_BY_WEIGHT[S.beqWeight ?? 1],
+    maxAge: st.maxAge, curYear: CY,
+    theta, eta, rho: rhoFromShape(h, eta, st), alpha: st.alpha,
+    beqMode: st.beqMode, beqFixed: st.beqFixed, gamma: 0.25,
+    phi: PHI_BY_WEIGHT[st.beqWeight ?? 1],
     // Averaged across the household, weighted by each person's earnings.
     eqHC: (() => {
-      const ppl = S.couple ? S.people : [S.people[0]];
+      const ppl = st.couple ? st.people : [st.people[0]];
       const tot = ppl.reduce((s,p)=>s+Math.max(0,p.salary),0);
       if (!(tot > 0)) return EQ_HC_BY_JOB[ppl[0].jobRisk ?? 1];
       return ppl.reduce((s,p)=>s+EQ_HC_BY_JOB[p.jobRisk ?? 1]*Math.max(0,p.salary),0)/tot;
     })(),
-    eqLiab: 0.15, rf: S.rf, fee: S.fee,
+    eqLiab: 0.15, rf: st.rf, fee: st.fee,
     pensionTaxHaircut: C.pensionTaxHaircut,
   };
 }
@@ -410,6 +410,141 @@ function buildRail() {
   ], false));
 }
 
+/* -------------------------------------------------------------- scenarios */
+/* "Retire at 62" against "retire at 67" is the question people actually have,
+   and until now the tool could hold only one answer at a time. A saved scenario
+   is a whole state; pinning one puts the difference on every figure below.
+
+   Storage is per country, because a Czech scenario means nothing in the UK
+   build, and every access is guarded: a browser in private mode throws on
+   localStorage rather than returning null. */
+const SCEN_KEY = 'lfp.scenarios.' + BUILD.country;
+const SCEN_MAX = 12;
+let scenarios = [], scenStore = true, compareWith = null;
+// null = not yet chosen by the reader, so follow whether anything is saved.
+let scenOpen = null;
+
+function scenLoadAll() {
+  let raw = null;
+  // Storage being unavailable and its contents being unreadable are different
+  // problems: only the first one is worth telling the user about.
+  try { raw = localStorage.getItem(SCEN_KEY); }
+  catch (e) { scenarios = []; scenStore = false; return; }
+  try {
+    scenarios = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(scenarios)) scenarios = [];
+  } catch (e) { scenarios = []; }
+  scenarios = scenarios.filter(s => s && typeof s.name === 'string' && s.state);
+}
+function scenPersist() {
+  try { localStorage.setItem(SCEN_KEY, JSON.stringify(scenarios)); }
+  catch (e) { scenStore = false; buildScenarios(); }
+}
+/** A deep copy, so later edits to the live state cannot reach back into a save. */
+const scenSnapshot = () => JSON.parse(JSON.stringify(S));
+
+/** Headline spending for a saved state — the one figure a chip can show. */
+function scenFigure(st) {
+  try {
+    const R = new Household(buildParams(st), ctx).solve();
+    return Number.isFinite(R.CD0) ? moneyK(R.CD0) : '—';
+  } catch (e) { return '—'; }
+}
+
+function scenSave(name) {
+  const nm = (name || '').trim().slice(0, 40) || T.scenUntitled;
+  const at = scenarios.findIndex(x => x.name === nm);
+  const rec = { name: nm, state: scenSnapshot() };
+  if (at >= 0) scenarios[at] = rec;
+  else { scenarios.unshift(rec); scenarios = scenarios.slice(0, SCEN_MAX); }
+  scenPersist(); buildScenarios(); render();
+}
+
+function buildScenarios() {
+  const box = document.getElementById('scenbar');
+  if (!box) return;
+  box.innerHTML = '';
+  const wrap = el('details');
+  wrap.open = scenOpen == null ? scenarios.length > 0 : scenOpen;
+  wrap.addEventListener('toggle', () => { scenOpen = wrap.open; });
+  wrap.appendChild(el('summary', { text: scenarios.length
+    ? fill(T.scenSummaryN, { n: scenarios.length }) : T.scenSummary }));
+  const inner = el('div', { class:'sinner' });
+  const row = el('div', { class:'srow' });
+
+  const inp = el('input', { type:'text', placeholder:T.scenNamePh, 'aria-label':T.scenNamePh,
+                            maxlength:'40' });
+  const go = () => { scenSave(inp.value); inp.value = ''; };
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  const btn = el('button', { class:'sbtn', type:'button', text:T.scenSave });
+  btn.addEventListener('click', go);
+  row.appendChild(inp); row.appendChild(btn);
+
+  scenarios.forEach((sc, i) => {
+    const on = compareWith === i;
+    const chip = el('span', { class:'chip' + (on ? ' on' : '') });
+    chip.appendChild(el('span', { class:'nm', text:sc.name }));
+    chip.appendChild(el('span', { class:'fig', text:scenFigure(sc.state) }));
+    const load = el('button', { type:'button', text:T.scenLoad });
+    load.addEventListener('click', () => {
+      S = JSON.parse(JSON.stringify(sc.state));
+      touched = true; compareWith = null;
+      buildRail(); buildInsuranceControls(); setText(); buildScenarios(); render();
+    });
+    const cmp = el('button', { type:'button', text: on ? T.scenComparing : T.scenCompare,
+                               'aria-pressed': String(on) });
+    cmp.addEventListener('click', () => {
+      compareWith = on ? null : i; buildScenarios(); render();
+    });
+    const del = el('button', { class:'x', type:'button', text:'\u00d7',
+                               'aria-label': T.scenDelete + ' ' + sc.name });
+    del.addEventListener('click', () => {
+      scenarios.splice(i, 1);
+      if (compareWith === i) compareWith = null;
+      else if (compareWith != null && compareWith > i) compareWith--;
+      scenPersist(); buildScenarios(); render();
+    });
+    chip.appendChild(load); chip.appendChild(cmp); chip.appendChild(del);
+    row.appendChild(chip);
+  });
+
+  inner.appendChild(row);
+  const hint = !scenStore ? T.scenUnavailable : (scenarios.length ? T.scenHintSome : T.scenHintNone);
+  inner.appendChild(el('div', { class:'shint', text:hint }));
+  wrap.appendChild(inner);
+  box.appendChild(wrap);
+}
+
+/** The pinned scenario solved, or null. Recomputed once per render. */
+function comparedResult() {
+  if (compareWith == null || !scenarios[compareWith]) return null;
+  try {
+    const p = buildParams(scenarios[compareWith].state);
+    const R = new Household(p, ctx).solve();
+    if (!Number.isFinite(R.CD0)) return null;
+    // The state pension is attached after the solve for the live result too;
+    // without it here the pension card silently never shows a difference.
+    R._pension = p.people.reduce((s, person) => s + ctx.statePension(person, null), 0);
+    return R;
+  } catch (e) { return null; }
+}
+
+/** "+£1,240 vs Retire at 62", coloured, or the flat case said in words.
+    dir: 1 more is better, -1 less is better, 0 neither — a bequest is a choice
+    and an equity share is a recommendation, so neither gets a verdict colour. */
+function deltaHTML(now, then, fmt, dir = 1) {
+  if (then == null || now == null || !Number.isFinite(then) || !Number.isFinite(now)) return '';
+  const name = scenarios[compareWith]?.name ?? '';
+  const d = now - then;
+  // Below a tenth of a percent the difference is not a difference.
+  if (Math.abs(d) <= Math.abs(then) * 0.001) {
+    return `<div class="delta flat">${fill(T.scenSame, { name })}</div>`;
+  }
+  const cls = dir === 0 ? 'flat' : ((d > 0) === (dir > 0) ? 'up' : 'dn');
+  const sign = d > 0 ? '+' : '\u2212';
+  return `<div class="delta ${cls}">${sign}${fmt(Math.abs(d))} ${fill(T.scenVs, { name })}</div>`;
+}
+
 /* ----------------------------------------------------------------- charts */
 const CSSVAR = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 function niceTicks(min, max, count) {
@@ -495,7 +630,7 @@ function legend(id, items) {
     `<span><i class="swatch${i.band?' band':''}" style="background:${i.color}"></i>${i.label}</span>`).join('');
 }
 
-function drawSpend(R) {
+function drawSpend(R, cmp) {
   const teal=CSSVAR('--teal'), brick=CSSVAR('--brick'), ink3=CSSVAR('--ink-3');
   const ys=R.years, x0=ys[0].age, x1=ys[ys.length-1].age;
   const floor = y => y.essentials + y.mortgage;
@@ -511,11 +646,18 @@ function drawSpend(R) {
   area(F, ys.map(y=>[y.age,floor(y)]), 0, brick, .22);
   line(F, ys.map(y=>[y.age,floor(y)]), brick, 1.75);
   line(F, ys.map(y=>[y.age,y.totalConsump]), teal, 2.25);
+  /* The compared plan, dashed. Its ages need not line up with this one — the
+     frame clips, which is the honest thing to do with a plan that starts or
+     ends somewhere else. */
+  const violet = CSSVAR('--violet');
+  if (cmp) line(F, cmp.years.map(y=>[y.age,y.totalConsump]), violet, 1.9, '5 4');
   const rt = R.retYear;
   if (rt>0 && rt<=R.maxYear) marker(F, ys[rt].age, T.retire, ink3);
 
-  legend('leg-spend',[{color:teal,label:T.legTotal},{color:teal,label:T.legRange,band:true},
-                      {color:brick, label: R.L0Mort > 0 ? T.legFloor : T.legFloorRent}]);
+  const items = [{color:teal,label:T.legTotal},{color:teal,label:T.legRange,band:true},
+                 {color:brick, label: R.L0Mort > 0 ? T.legFloor : T.legFloorRent}];
+  if (cmp) items.push({ color:violet, label: scenarios[compareWith]?.name ?? '' });
+  legend('leg-spend', items);
 }
 function drawWealth(R) {
   const teal=CSSVAR('--teal'), amber=CSSVAR('--amber'), brick=CSSVAR('--brick'),
@@ -602,30 +744,36 @@ function derivationHTML(R) {
     <tr><td><span class="op">÷</span>${T.divisorRow}</td><td>${R.D0.toFixed(1)}</td></tr>
     <tr class="sum"><td>${T.heroLabel}</td><td>${money(R.CD0)}</td></tr></table>`;
 }
-function drawHeadline(R) {
+function drawHeadline(R, cmp) {
   const y0 = R.years[0];
+  const c0 = cmp ? cmp.years[0] : null;
   const mortNote = R.mortgagePayment > 0 ? T.andMortgage : '';
   const cards = [
     { hero:true, k:T.heroLabel, accent:'var(--teal)',
       v:`${money(R.CD0)} <span style="font-size:.5em;font-weight:400;color:var(--ink-2)">${T.perYear}</span>`,
       n:fill(T.heroNote,{ m:money(R.CD0/12),
                           t:money(R.CD0 + y0.essentials + y0.mortgage), mort:mortNote }),
+      d: cmp ? deltaHTML(R.CD0, cmp.CD0, money, 1) : '',
       why:true },
     { k:T.cardNetWorth, v:moneyK(R.W0), accent:'var(--slate)',
-      n:`${moneyK(R.F0)} + ${moneyK(R.H0)} − ${moneyK(R.L0)}` },
+      n:`${moneyK(R.F0)} + ${moneyK(R.H0)} − ${moneyK(R.L0)}`,
+      d: cmp ? deltaHTML(R.W0, cmp.W0, moneyK, 1) : '' },
     { k:T.cardEquity,
       v: y0.equityShareCon == null ? T.noSavingsShort : pct(y0.equityShareCon),
       accent:'var(--teal)',
       n: y0.equityShareCon == null ? T.noSavingsNote
-         : (y0.equityShareUncon > 1.05 ? `${T.legIdeal}: ${pct(y0.equityShareUncon)}` : '') },
+         : (y0.equityShareUncon > 1.05 ? `${T.legIdeal}: ${pct(y0.equityShareUncon)}` : ''),
+      d: cmp ? deltaHTML(y0.equityShareCon, c0.equityShareCon, v => pct(v, 1), 0) : '' },
     { k:T.cardPension, v:moneyK(R._pension), accent:'var(--amber)',
-      n:`${C.code} · ${C.taxYear}` },
+      n:`${C.code} · ${C.taxYear}`,
+      d: cmp ? deltaHTML(R._pension, cmp._pension, moneyK, 1) : '' },
     /* Filled in by paintIPCard when the insurance solve lands — it is far too
        slow to run inside the headline redraw. */
     { k:T.cardIP, v:'—', accent:'var(--brick)', n:'', ip:true },
   ];
   if (S.beqMode !== 'none') cards.push(
-    { k:T.cardBequest, v:moneyK(R.beq), accent:'var(--violet)', n:'' });
+    { k:T.cardBequest, v:moneyK(R.beq), accent:'var(--violet)', n:'',
+      d: cmp ? deltaHTML(R.beq, cmp.beq, moneyK, 0) : '' });
 
   document.getElementById('headline').innerHTML = cards.map((c,i) =>
     `<div class="stat${c.hero?' hero':''}" style="--accent:${c.accent}">
@@ -633,6 +781,7 @@ function drawHeadline(R) {
        <div class="v"${c.ip?' id="ip-headline-v"':''}>${c.v}</div>
        ${c.ip?'<div class="n" id="ip-headline-n"></div>':''}
        ${c.n?`<div class="n">${c.n}</div>`:''}
+       ${c.d||''}
        ${c.why?`<button class="why noprint" id="whybtn">${T.explain}</button>
                 <div class="derivation" id="deriv" hidden>${derivationHTML(R)}</div>`:''}
      </div>`).join('');
@@ -834,8 +983,11 @@ function render() {
   R._pension = p.people.reduce((s,person)=>s + ctx.statePension(person, null), 0);
 
   lastR = R;
-  drawHeadline(R); drawAlerts(R); paintIPCard();
-  drawSpend(R); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawInsurance();
+  // One extra solve per render when a scenario is pinned; the model runs in
+  // under 2 ms, so the comparison is live rather than a button you press.
+  const cmp = comparedResult();
+  drawHeadline(R, cmp); drawAlerts(R); paintIPCard();
+  drawSpend(R, cmp); drawWealth(R); drawGlide(R); drawSurv(R); drawBalanceSheet(R); drawInsurance();
 
   const so = document.getElementById('shape-out');
   if (so) so.innerHTML = fill(T.shapeReadout, { g: pct(R.g, 1) });
@@ -1017,6 +1169,8 @@ function init() {
   readURL();
   setText();
   buildRail();
+  scenLoadAll();
+  buildScenarios();
 
   document.getElementById('theme').addEventListener('click', () => {
     const cur = document.documentElement.getAttribute('data-theme');
@@ -1025,7 +1179,8 @@ function init() {
     render();
   });
   document.getElementById('reset').addEventListener('click', () => {
-    S = freshState(); touched = false; buildRail(); render();
+    S = freshState(); touched = false; compareWith = null;
+    buildRail(); buildInsuranceControls(); buildScenarios(); render();
   });
   document.getElementById('share').addEventListener('click', async () => {
     const b = document.getElementById('share');

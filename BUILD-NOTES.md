@@ -163,6 +163,18 @@ Sanity check from the test suite: with equivalence-scaled essentials a couple ge
   pay with a real mortgage. The UK default has £8,092/year of discretionary spending,
   which is sobering and correct.
 
+## Comparing two plans
+
+Saved plans live in `localStorage`, keyed by country, and hold a whole state rather than a
+diff. Pinning one solves it alongside the live plan — one extra run of the model per render,
+which the 1.8 ms solve makes affordable enough to be live rather than a button.
+
+Two decisions worth recording. Differences are coloured only where a direction is
+meaningful: more spending and more net worth are better, but a larger bequest is a choice
+and an equity share is a recommendation, so neither gets a verdict colour. And a difference
+below a tenth of a percent is reported as "the same as", because a tool that reports
+£8,298.14 against £8,298.09 as a change is lying about its own precision.
+
 ## Independent audit
 
 Everything above was then independently audited; seventeen real defects were found and
