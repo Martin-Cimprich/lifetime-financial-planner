@@ -11,6 +11,7 @@ const bundle = [
   '/* ==== generated at build time from lifetables/engine/countries ==== */',
   strip('lifetables.mjs'),
   strip('disability.mjs'),
+  strip('care.mjs'),
   strip('engine.mjs'),
   strip('countries.mjs'),
 ].join('\n');
@@ -19,6 +20,7 @@ const bundle = [
 for (const [name, re] of [
   ['engine', /class Household/], ['life tables', /UK_LIFE_TABLE/],
   ['countries', /const UK = \{/], ['CZ pension', /czAccrualRate/],
+  ['care', /calibrateCare/],
 ]) if (!re.test(bundle)) throw new Error(`bundle is missing ${name}`);
 
 /* Every string must exist in both languages. A key present in one and missing

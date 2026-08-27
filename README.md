@@ -109,6 +109,7 @@ strictly dominated by the alternative.
 | **Job risk** | How share-like your earnings are drives how many shares your savings should hold. A civil servant's income is a bond; a founder's is not. |
 | **Early retirement** | "Stop working at" and "state pension starts at" are separate. Set the first below the second and the model shows the income gap and warns about it. |
 | **Disability risk** | Earnings arrive only while you can earn. Human capital is weighted by published disability incidence (CMI WP48 for the UK, ČSSZ invalidity awards for Czechia), which lowers human capital, spending and the recommended equity share. Treating a salary as a risk-free bond was the model's most flattering assumption. |
+| **Long-term care** | The last uninsured catastrophe in the plan: charged as an expected cost, the chance at each age times what a year would cost *on top of* what you were already spending, rather than shown as a scenario. It is met from housing equity — but only in the states where the home is genuinely free, since a couple with one partner in care still needs the house. For an owner the house absorbs it and the headline does not move; for a renter it takes 5% of spending at 35 and 26% at 75. |
 | **The idea, in five steps** | A walkthrough that teaches the model's argument rather than its parameters: your salary is an asset → it behaves like a bond → which is why a young person holds shares → the balance sheet turns into spending → and the one asset you cannot diversify. One idea and one control per step, driving the real model, so the charts move underneath as the reader plays. Whatever they do can be kept or handed back at the end. |
 | **Comparing two plans** | Save the plan on screen, change something, and pin the saved one. Every headline figure gains a difference against it and the spending chart gains its line. "Retire at 62" against "retire at 67" is the question people actually have, and it needs two answers at once. Saved in the browser, per country, never sent anywhere. |
 | **Income protection** | Priced from that same incidence and sized from your own balance sheet: the chance it happens, the cover that makes you whole, the cover worth buying at the market's margin, and what it costs. The margin is estimated from your occupation rather than asked for. Each earner in a couple is priced separately, on their own occupation and their own existing cover, because a household's biggest exposure is usually one particular salary. Campbell's self-insurance rule is shown alongside — and where the rule and the exact solve disagree, the copy says which is which. |
@@ -188,6 +189,8 @@ node test-features.mjs   # couples, housing, fees, early retirement
 node test-countries.mjs  # tax, pensions, mortality, risk mapping vs published figures
 node test-personas.mjs   # economic direction-of-effect across realistic households
 node test-cz-pension.mjs # Czech state pension against the ČSSZ published table
+node test-care.mjs       # the care prevalence fit, the incremental charge, the home
+node test-insurance.mjs  # income protection, Campbell's rule, cover already held
 ```
 
 `build.mjs` regenerates the engine bundle from source on every run and refuses to write
@@ -197,6 +200,8 @@ if the result is incomplete. See [AUDIT.md](AUDIT.md) for why that guard exists.
 |---|---|
 | `src/engine.mjs` | the model |
 | `src/countries.mjs` | tax, pensions, earnings curves, risk elicitation |
+| `src/disability.mjs` | published disability incidence, occupation loadings |
+| `src/care.mjs` | long-term care prevalence and cost, both countries |
 | `src/lifetables.mjs` | generated from official mortality data — do not hand-edit |
 | `src/i18n.js` | all user-facing copy, English and Czech |
 | `src/app.js` | interface and charts |
@@ -244,8 +249,42 @@ point on the rate moves the UK default household's spending by about 13%. Moving
 default from 1.5% to a sourced 1.75% raised it 3.4%; moving the Czech default from 1.5% to
 2.25% raised it 6.5%.
 
+## Long-term care, and why the two countries diverge
+
+Charged as an expected cost rather than shown as a scenario, because a plan that leaves it
+out is quietly assuming it will not happen — and for about a quarter of people it will.
+
+**The two systems are structurally opposite, and that is the finding.** A year in residential
+care costs **3.6 times a year's essential spending in the UK** and **0.3 times it in
+Czechia**. England has no cap at all — the £86,000 Dilnot cap was legislated for October 2025
+and then scrapped on 29 July 2024 — so a self-funder pays the full fee until capital falls to
+£23,250. Czechia caps the charge by regulation (from 1 January 2026, 290 CZK a day for board
+and 335 for accommodation) and meets the care itself through příspěvek na péči. A shared model
+would hide the most important difference between them, exactly as it would for the two state
+pensions.
+
+**The home is what pays for it**, and this is where the model's treatment of housing earns its
+keep. The house is not spendable in the baseline — you have to live somewhere — but it *is*
+what funds care, and only in the states where nobody is left living in it. A couple with one
+partner in care still needs the house. On the UK defaults the expected cost is £21,442 and
+£170,000 of equity absorbs all of it, so the headline does not move; for a renter the whole
+amount stays on the balance sheet and costs 5.6% of spending at 35, 14.9% at 60 and 26.1% at
+75. Equity already earmarked for downsizing cannot pay for care as well.
+
+**The weakest data in the tool, and it says so on screen.** Prevalence is anchored on published
+figures — 2.5% of over-65s and 10.8% of over-85s in England and Wales (ONS Census 2021), and
+about 2.4% of over-65s in Czechia (MPSV 2024: roughly 34,000 users of domovy pro seniory and
+25,500 of domovy se zvláštním režimem against a 65+ population near 2.24 million). Those two
+levels agreeing, from completely different care systems, is why the age *shape* — which only
+the UK publishes — is used for both. Only two points constrain that shape, so it is not
+transcribed but calibrated: an exponential in age whose two parameters are solved to reproduce
+both published figures under the country's own life table, which `test-care.mjs` asserts. It
+implies a doubling every 3.5 years of age. The share of essential spending that board and
+lodging displaces (65%) is a judgement, not a source. All of which is why the charge can be
+switched off — and switching it off is what most tools do silently.
+
 ## Known limits
 
-No children, no divorce, no redundancy, no long-term care. Tax bands are frozen in real terms, so
+No children, no divorce, no redundancy. Tax bands are frozen in real terms, so
 long projections understate fiscal drag. UK figures use England/Wales/NI rates; Scotland
 differs and the tool says so on screen.

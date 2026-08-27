@@ -200,7 +200,8 @@ implemented properly.
 
 ## Known limits
 
-No children, no divorce, no redundancy, no long-term care. Investment returns are the
+No children, no divorce, no redundancy. Long-term care is modelled — see
+[README.md](README.md) for what it rests on. Investment returns are the
 original Morningstar/Ibbotson capital market assumptions, which are US-centric — the
 mortality, tax, pension and earnings layers are localised but the return assumptions are
 not. Czech and UK real risk-free rates are set to 1.5% and are editable. Tax bands are

@@ -36,6 +36,10 @@ function freshState() {
        estimate". An override applies to the whole household, because it is a
        fact about the market rather than about a person. */
     loadingOverride: null,
+    /* Late-life care is charged as an expected cost. On by default, because
+       leaving it out overstates what can be spent; switchable, because it is the
+       least well evidenced figure in the tool. */
+    includeCare: true,
   };
 }
 let S = freshState();
@@ -133,6 +137,16 @@ function buildParams(st = S) {
     pensionTaxHaircut: C.pensionTaxHaircut,
   };
 }
+/* The care prevalence curve is fitted to two published figures using this
+   country's survival curve as the age weighting, so it has to be solved once
+   before anything asks it for a rate. Male and female averaged: the published
+   anchors are for both sexes together. */
+calibrateCare(BUILD.country, (age) => {
+  let s = 0;
+  for (const sex of [1, 2]) s += new Mortality(C.lifeTable, sex, 0).survive(65, Math.max(0, age - 65));
+  return s / 2;
+});
+
 const ctx = {
   mortalityTable: C.lifeTable,
   salaryCurve: C.salaryCurve,
@@ -142,6 +156,10 @@ const ctx = {
   hazard: (person, age) => disabilityRate(BUILD.country, age, person.sex, person.occClass ?? 0),
   ability: (person, age) =>
     abilityToWork(BUILD.country, person.age, age, person.sex, person.occClass ?? 0),
+  /* Long-term care. Supplying these turns the charge on at all; leaving them out
+     is how the reduction test keeps reproducing the original workbook. */
+  careRate: (age) => S.includeCare ? careRate(BUILD.country, age) : 0,
+  careNetAnnual: (essPerPerson) => careNetAnnual(BUILD.country, essPerPerson),
 };
 
 /* ------------------------------------------------------------------- rail */
@@ -407,6 +425,36 @@ function buildRail() {
         box.innerHTML = fill(T.rfImplied, {
           eq: pct(r.eq, 1), geo: pct(r.eqGeo, 1), sd: pct(r.sdEq, 0), bond: pct(r.bond, 1),
         }) + '<br><span style="opacity:.85">' + T[BUILD.country === 'CZ' ? 'rfSourceCZ' : 'rfSourceUK'] + '</span>';
+      };
+      box._update();
+      return box;
+    })(),
+    /* Late-life care. Charged as an expected cost, because a plan that ignores
+       it overstates what can be spent — but it rests on the thinnest data in the
+       tool, so it is switchable and the arithmetic is shown rather than implied. */
+    seg(T.careQ, [T.no, T.yes], () => S.includeCare ? 1 : 0,
+        v => S.includeCare = !!v, T.careHelp),
+    (() => {
+      const box = el('div', { class:'field readout' });
+      box._update = () => {
+        if (!S.includeCare) { box.innerHTML = T.careOff; return; }
+        const R = lastR;
+        if (!R || !Number.isFinite(R.L0CareGross)) { box.innerHTML = ''; return; }
+        const annual = careNetAnnual(BUILD.country, (S.cbar || 0) / (S.couple ? 2 : 1));
+        const years = annual > 0 ? R.careEquity / annual : 0;
+        let s = fill(T.careReadout, { cost: money(R.L0CareGross), yr: money(annual) });
+        if (R.careFromHome > 0) {
+          const key = R.L0Care > 0 ? T.carePartHome
+                    : (years > 10 ? T.careAllHomeAmple : T.careAllHome);
+          s += ' ' + fill(key, {
+            home: money(R.careFromHome), left: money(R.L0Care), eq: money(R.careEquity),
+            yrs: years.toLocaleString(C.locale, { maximumFractionDigits: 1 }),
+          });
+        } else if (!S.own) {
+          s += ' ' + T.careNoHome;
+        }
+        box.innerHTML = s + '<br><span style="opacity:.85">' +
+          T[BUILD.country === 'CZ' ? 'careSourceCZ' : 'careSourceUK'] + '</span>';
       };
       box._update();
       return box;
@@ -1099,6 +1147,7 @@ function drawBalanceSheet(R) {
     row(T.rowSavings,R.F0) + row(T.rowHC,R.H0) + row(T.rowTotal,tot,true) + '</tbody>';
   let liab = row(T.rowEss,R.L0Ess);
   if (R.L0Mort>0) liab += row(T.rowMort,R.L0Mort);
+  if (R.L0Care>0) liab += row(T.rowCare,R.L0Care);
   if (R.L0Cash>0) liab += row(T.rowBeq,R.L0Cash);
   document.getElementById('bs-liab').innerHTML =
     `<thead><tr><th></th><th>${T.value}</th><th>${T.share}</th></tr></thead><tbody>` +
@@ -1206,6 +1255,7 @@ function writeURL() {
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
   put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  put('ltc',S.includeCare?1:0,D.includeCare?1:0);
   if (S.loadingOverride != null) q.set('ld', String(S.loadingOverride));
   const s = q.toString();
   /* An origin-less document — a sandboxed iframe, a data: URL, some local
@@ -1259,6 +1309,7 @@ function readURL() {
   num('sm',v=>S.smooth=v,0,2,true); num('al',v=>S.alpha=v,0,1);
   num('fe',v=>S.fee=v,0,0.03); num('rf',v=>S.rf=v,-0.02,0.08);
   num('ma',v=>S.maxAge=v,70,115,true);
+  num('ltc',v=>S.includeCare=!!v,0,1,true);
   /* Occupation and cover were household-level until they became per-person.
      Links minted before that carry the old keys; read them onto the first
      earner so a shared scenario does not quietly lose them. */

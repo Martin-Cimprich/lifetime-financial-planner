@@ -79,6 +79,10 @@ These are small-loss, high-frequency insurances. In a life-cycle model they are 
 of `cbar` — you pay premiums, that is essential spending, done. Modelling them explicitly
 would add inputs without changing any decision the model exists to inform.
 
+> **Since built.** The long-term care hole named below is now modelled, as an expected
+> late-life liability met from housing equity. See the long-term care section of
+> [README.md](README.md) and round five of [AUDIT.md](AUDIT.md).
+
 There is one exception worth naming: **catastrophic uninsured loss** (long-term care in the
 UK, where costs are unbounded and state support is means-tested). That is a genuine
 tail-risk hole in the plan, but it is a different modelling problem — a low-probability,

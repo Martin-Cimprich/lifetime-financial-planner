@@ -87,6 +87,12 @@ data:
   tax year 2025/26.
 - **MPSV, ČSSZ, Finanční správa ČR** — Czech tax, social and health insurance, and
   starobní důchod parameters, 2026.
+- **ONS**, *Older people living in care homes in 2021 and changes since 2011*, Census 2021 —
+  UK residential care prevalence. © Crown copyright, Open Government Licence v3.0.
+- **MPSV**, *Statistická ročenka z oblasti práce a sociálních věcí 2024* — Czech residential
+  care users.
+- **carehome.co.uk**, 2026 fee survey — UK care home fees; **MPSV / zákon č. 108/2006 Sb.** —
+  Czech regulated maximum úhrada and příspěvek na péči, 2026.
 - **UK gilt market data** — 10-year index-linked gilt real yield, June 2026, used for the
   UK real risk-free rate default.
 - **Czech National Bank** — 10-year government bond yield and the 2% inflation target, 2026,
@@ -101,7 +107,7 @@ derivation and what it implies for returns, and it is editable.
 **This is an educational tool. It is not financial, investment, tax or legal advice.**
 
 It shows what one economic model implies from the numbers a user types. It makes no
-allowance for children, divorce, redundancy, long-term care, or changes in the law. It
+allowance for children, divorce, redundancy, or changes in the law. It
 does not know the user's circumstances. Expected investment returns are assumptions, not
 forecasts, and are drawn from the original model's US-centric capital market assumptions.
 

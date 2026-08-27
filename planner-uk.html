@@ -589,6 +589,180 @@ const marketLoading = (country, occClass = 0) =>
   (LOADING_BY_OCCUPATION[country] || LOADING_BY_OCCUPATION.UK)[occClass] ?? 0.6;
 
 /* ===========================================================================
+   Long-term care — the late-life liability the plan otherwise ignores.
+
+   This is the one uninsured catastrophe left in the model: low probability,
+   very large, and arriving at the age when there is no earning capacity left to
+   absorb it. It is charged as an expected cost on the liability side, the way
+   disability risk is charged against human capital, rather than shown as a
+   scenario — because a plan that ignores it is overstating what can be spent.
+
+   THE TWO COUNTRIES ARE STRUCTURALLY OPPOSITE, and that is the finding worth
+   having. England has no cap at all: the Dilnot cap of GBP 86,000 was legislated
+   for October 2025 and then scrapped on 29 July 2024, so a self-funder pays the
+   full fee until capital falls to the means-test limit, and the exposure runs to
+   the whole estate. Czechia caps the charge by regulation and covers the care
+   itself through prispevek na peci, so the household's exposure is a fraction of
+   the same risk. A shared model would hide the most important difference between
+   them.
+
+   ---------------------------------------------------------------- prevalence
+
+   What is needed is the probability of being IN residential care at a given age,
+   conditional on being alive — a prevalence, not a lifetime incidence — because
+   that is what multiplies an annual cost to give an expected annual cost.
+
+   UK: ONS, Census 2021, "Older people living in care homes in 2021 and changes
+   since 2011". 278,946 usual residents aged 65+ were living in care homes in
+   England and Wales; 2.5% of the 65+ population, and 10.8% of the 85+
+   population (down from 13.7% in 2011).
+   https://www.ons.gov.uk/peoplepopulationandcommunity/birthsdeathsandmarriages/ageing/articles/olderpeoplelivingincarehomesin2021andchangessince2011/2023-10-09
+
+   CZ: MPSV, Statisticka rocenka z oblasti prace a socialnich veci 2024. At the
+   end of 2024 there were roughly 34,000 users of domovy pro seniory and 25,500
+   of domovy se zvlastnim rezimem. Against a 65+ population near 2.24 million,
+   and allowing for the minority of residents under 65, that is about 2.4% of the
+   65+ population.
+   https://mpsv.gov.cz/statisticka-rocenka-z-oblasti-prace-a-socialnich-veci-2024
+
+   THE TWO LEVELS AGREE — 2.5% and 2.4%, from two completely different care
+   systems and two independent statistical offices. That agreement is the reason
+   the age SHAPE, which only the UK publishes, is used for both. The shape is the
+   assumption actually doing the work here, exactly as with disability incidence,
+   and it is weaker evidence than the levels.
+
+   Only two published points constrain the UK shape, so it is not transcribed but
+   CALIBRATED: an exponential in age, with its two parameters solved so that the
+   curve reproduces both published figures under the country's own life table as
+   the age weighting. Using the life table rather than today's population is
+   deliberate — the curve is applied to the model's own projected survival path,
+   so consistency with that path matters more than consistency with the current
+   age structure. Both reproductions are asserted in test-care.mjs.
+
+   ---------------------------------------------------------------------- cost
+
+   UK: carehome.co.uk's 2026 survey puts the UK average at GBP 1,298 a week for
+   residential care and GBP 1,535 for nursing care. Residential is used, as the
+   larger of the two populations. In England capital above GBP 23,250 means
+   self-funding in full, and self-funder rates run materially above the rates
+   councils pay, so the published average is if anything an understatement of
+   what a self-funder faces. There is no lifetime cap.
+
+   CZ: capped by regulation. From 1 January 2026 the maximum uhrada is 290 CZK a
+   day for full board and 335 CZK a day for accommodation (380 for a single
+   room), and at least 15% of the resident's income must be left to them. The
+   care itself is met by prispevek na peci, which for adults in 2026 is 1,300 /
+   5,400 / 14,800 / 23,000 CZK a month across the four degrees of dependence;
+   third degree is used, as the level that corresponds to needing residential
+   care.
+   =========================================================================== */
+
+/** Published prevalence anchors: share of the age group living in care. */
+const CARE_ANCHORS = {
+  UK: { all65: 0.025, over85: 0.108 },   // ONS Census 2021, England and Wales
+  CZ: { all65: 0.024, over85: 0.108 },   // MPSV 2024 level, UK shape
+};
+
+/** Gross cost, and what the state carries, in each country's own currency. */
+const CARE_COST = {
+  UK: {
+    grossAnnual: 1298 * 52,        // residential, carehome.co.uk 2026 survey
+    stateAnnual: 0,                // means-tested to nothing above the capital limit
+    capitalLimit: 23250,           // England, upper limit: above it you self-fund
+    lifetimeCap: null,             // the Dilnot cap was scrapped on 29 July 2024
+  },
+  CZ: {
+    /* Board and accommodation only. The care component is charged separately and
+       is met by prispevek na peci — 14,800 CZK a month at third degree in 2026,
+       paid to the facility — so it is excluded from the gross figure rather than
+       netted off it. Deducting it from the board charge as well would credit the
+       household twice for the same transfer, which is what a first pass did. */
+    grossAnnual: (290 + 335) * 365,   // maximum uhrada, board and accommodation
+    stateAnnual: 0,
+    capitalLimit: null,               // not capital-tested
+    lifetimeCap: null,
+  },
+};
+
+/* What a care home replaces rather than adds. A resident stops paying for their
+   own housing, heating, food and most of what "essential spending" covers, so
+   charging the whole fee on top of unchanged essentials would count the same
+   pound twice. Two thirds is a judgement, stated here rather than buried: it is
+   the share of a single person's essential budget that board and lodging
+   displaces. It is the least evidenced number in this file. */
+const CARE_DISPLACES = 0.65;
+
+/* An exponential in age fitted to the two published anchors. Held as a constant
+   per country rather than solved on every call: the solve needs a life table,
+   which lives in the country module, so calibrateCare() below does it once. */
+const fitted = {};
+
+/**
+ * Prevalence of residential care at `age`, conditional on being alive.
+ * Zero below 65 — the model is not trying to describe care for working-age
+ * disability, which the income-protection panel handles instead.
+ */
+function careRate(country, age) {
+  const f = fitted[country];
+  if (!f || age < 65) return 0;
+  return Math.min(0.95, f.p0 * Math.exp(f.k * (age - 65)));
+}
+
+/**
+ * Solve p0 and k so the curve reproduces both published figures, weighting each
+ * age by the probability of being alive at it. Called once per country at
+ * startup with that country's own life table.
+ *
+ * @param survive (age) => probability of being alive at that age, from 65
+ */
+function calibrateCare(country, survive) {
+  const A = CARE_ANCHORS[country];
+  if (!A) return null;
+  const ages = [];
+  for (let a = 65; a <= 105; a++) ages.push(a);
+  const w = ages.map(survive);
+
+  // Weighted mean of exp(k(a-65)) over a set of ages: the shape, before scaling.
+  const shape = (k, from) => {
+    let num = 0, den = 0;
+    ages.forEach((a, i) => {
+      if (a < from) return;
+      num += w[i] * Math.exp(k * (a - 65));
+      den += w[i];
+    });
+    return den > 0 ? num / den : 0;
+  };
+  /* The ratio of the two anchors pins k on its own: scaling cancels. Bisect on
+     it, because the ratio rises monotonically with k. */
+  const want = A.over85 / A.all65;
+  let lo = 0.001, hi = 0.5;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    const r = shape(mid, 85) / Math.max(shape(mid, 65), 1e-15);
+    if (r < want) lo = mid; else hi = mid;
+  }
+  const k = (lo + hi) / 2;
+  const p0 = A.all65 / Math.max(shape(k, 65), 1e-15);
+  fitted[country] = { p0, k };
+  return { p0, k };
+}
+
+/** For tests and for the copy: what the calibration came out as. */
+const careFit = (country) => fitted[country] || null;
+
+/**
+ * Net annual cost of a year in care to the household, on top of what it was
+ * already spending. `essentialsPerPerson` is that person's share of essential
+ * spending, most of which board and lodging replaces.
+ */
+function careNetAnnual(country, essentialsPerPerson) {
+  const c = CARE_COST[country];
+  if (!c) return 0;
+  const displaced = CARE_DISPLACES * Math.max(0, essentialsPerPerson);
+  return Math.max(0, c.grossAnnual - c.stateAnnual - displaced);
+}
+
+/* ===========================================================================
    Life-cycle planner engine, v2.
 
    Generalises the Idzorek-Kaplan parent life-cycle model (Idzorek & Kaplan,
@@ -1198,13 +1372,59 @@ class Household {
       }
     }
 
+    /* --- long-term care --------------------------------------------------
+       Charged as an expected cost rather than shown as a scenario: a plan that
+       ignores it overstates what can be spent. The charge is INCREMENTAL — a
+       resident stops paying for their own housing and food — and it is offset by
+       housing equity, but only in the states where the home is genuinely free.
+       A couple with one partner in care still needs the house.
+
+       careVec is the whole expected cost. careFree is the part of it arising in
+       states where nobody is left living in the home, which is the only part the
+       house can be sold to meet. */
+    const careVec = new Array(T + 1).fill(0);
+    const careFree = new Array(T + 1).fill(0);
+    if (this.ctx.careRate && !this.p.ignoreCare) {
+      const essPer = (this.p.cbar || 0) / this.n;
+      const net = this.ctx.careNetAnnual ? this.ctx.careNetAnnual(essPer) : 0;
+      for (let t = 0; t <= T; t++) {
+        const hh = Math.max(this.pHousehold(t), 1e-12);
+        for (let i = 0; i < this.n; i++) {
+          const rate = this.ctx.careRate(this.ageAt(i, t));
+          if (rate <= 0) continue;
+          const cost = Math.min(this.pAlive(i, t) / hh, 1) * rate * net;
+          careVec[t] += cost;
+          /* The home is free when every other member is either gone or also in
+             care. With one person that is always true. */
+          let free = 1;
+          for (let j = 0; j < this.n; j++) {
+            if (j === i) continue;
+            const aliveJ = Math.min(this.pAlive(j, t) / hh, 1);
+            free *= 1 - aliveJ * (1 - this.ctx.careRate(this.ageAt(j, t)));
+          }
+          careFree[t] += cost * free;
+        }
+      }
+    }
+    const L0CareGross = this.pdv(careVec, 0, kC);
+    const L0CareFree = this.pdv(careFree, 0, kC);
+    /* Equity available to meet care: today's, net of any already earmarked for
+       downsizing, which is a windfall on the asset side and cannot be spent
+       twice. Not discounted — it is a stock held today, not a future stream. */
+    const careEquity = H.own
+      ? Math.max(0, ((H.value || 0) - Math.max(0, H.mortgageBalance || 0))
+                    * (1 - (H.downsizeRelease || 0)))
+      : 0;
+    const careFromHome = Math.min(L0CareFree, careEquity);
+    const L0Care = Math.max(0, L0CareGross - careFromHome);
+
     // --- balance sheet ----------------------------------------------------
     const H0r = this.pdv(incVec, 0, kY);          // human capital, after tax
     const H0w = this.pdv(windfall, 0, rf);        // downsizing proceeds
     const H0 = H0r + H0w;
     const L0Ess = this.pdv(essVec, 0, kC);
     const L0Mort = this.pdv(mortVec, 0, rf);      // a contractual, riskless stream
-    const L0Risky = L0Ess + L0Mort;
+    const L0Risky = L0Ess + L0Mort + L0Care;
 
     const sav = this.p.savings;
     const F0 = sav.shares + sav.bonds + sav.cash
@@ -1246,7 +1466,11 @@ class Household {
     const years = [];
     for (let t = 0; t <= T; t++) {
       const HR = this.pdv(incVec, t, kY) + this.pdv(windfall, t, rf);
-      const LR = this.pdv(essVec, t, kC) + this.pdv(mortVec, t, rf);
+      /* The remaining care liability is the gross stream from here on, less
+         whatever of the house is still available to meet it. */
+      const careLeft = Math.max(0, this.pdv(careVec, t, kC)
+        - Math.min(this.pdv(careFree, t, kC), careEquity));
+      const LR = this.pdv(essVec, t, kC) + this.pdv(mortVec, t, rf) + careLeft;
       const LC = beq * this.liPerm(t);
       const Dt = this.consumpDiv(t, h);
       const numIVA = this.ivaFn(0, t, g) * CD0;
@@ -1288,6 +1512,8 @@ class Household {
 
     return {
       h, g, H0, H0r, H0w, L0, L0Risky, L0Ess, L0Mort, L0Cash, F0, W0, w0SansLI,
+      // Long-term care: what it costs, and how much of it the house absorbs.
+      L0Care, L0CareGross, careFromHome, careEquity,
       D0, CD0, beq, maxBeq, beqDiv, liPerm0, mortgagePayment: mPay,
       retYear: this.retYear, maxYear: T, baseAge: this.baseAge,
       years, cma: this.cma, muIVA, sigmaIVA,
@@ -1853,6 +2079,17 @@ en: {
   jobRiskNoteLow: 'That is a large bond you already own, which is why shares belong in your savings.',
   jobRiskNoteHigh: 'You already carry equity risk through your job, so your savings should carry less.',
   printBlocked: 'Use Ctrl+P',
+  rowCare: 'Late-life care, expected',
+  careQ: 'Allow for the cost of late-life care?',
+  careHelp: 'Roughly one person in forty over 65 is living in residential care at any time, and one in nine over 85. A plan that leaves it out is quietly assuming it will not happen. It is charged here as an expected cost — the chance at each age multiplied by what a year would cost on top of what you were already spending — rather than as a scenario, because the point is what it does to what you can afford now.',
+  careOff: 'Left out. Everything below is what the plan looks like if late-life care never happens, which for about a quarter of people it will.',
+  careReadout: 'Expected cost over the whole plan: <b>{cost}</b> in today’s money, from {yr} a year in the years it happens, on top of what you were already spending.',
+  careAllHome: 'Your home covers all of it — {home} — and that is what the equity is for. It would pay for about <b>{yrs} years</b> of care, against a typical stay of two to three; beyond that the means test takes over.',
+  careAllHomeAmple: 'Your home covers all of it several times over: {home} of expected cost against {eq} of equity. Care is not what limits this plan.',
+  carePartHome: 'Your home covers {home} of it, about {yrs} years of care, and <b>{left}</b> is left on the balance sheet. A typical stay is two to three years.',
+  careNoHome: 'You are renting, so there is no house to sell for it: the whole amount sits on the balance sheet, which is why it costs a renter far more than an owner.',
+  careSourceUK: 'Prevalence: ONS Census 2021 (2.5% of over-65s, 10.8% of over-85s), the age shape fitted to both. Fees: UK average £1,298 a week for residential care, 2026. England has no lifetime cap — the £86,000 cap was scrapped on 29 July 2024.',
+  careSourceCZ: 'Výskyt: MPSV 2024 (domovy pro seniory a domovy se zvláštním režimem), věkový profil podle britských dat. Úhrada: regulovaný strop od 1. 1. 2026, péči hradí příspěvek na péči.',
   rfImplied: 'Nothing here asks what return to expect: the model derives it from how the assets move together and from this rate. At the rate above it implies about <b>{eq}</b> a year on shares in real terms with a spread of {sd} — which compounds to <b>{geo}</b>, the figure a saver actually lives with — and about <b>{bond}</b> on bonds. Gross of your charges, and assumptions rather than forecasts.',
   rfSourceUK: 'Default: the 10-year index-linked gilt yielded 1.68% real in June 2026, rounded down to 1.75% after the RPI-to-CPIH alignment.',
   rfSourceCZ: 'Default: no Czech index-linked market exists, so this is derived — a 10-year government yield near 4.9% in 2026 against the CNB’s 2% target, less about half a point of inflation risk premium. Weaker evidence than the UK figure.',
@@ -2058,7 +2295,7 @@ en: {
 
   footHow: 'Where this comes from.',
   footNotAdvice: 'Not advice.',
-  footNotAdviceBody: 'No allowance for children, divorce, redundancy, long-term care, or a change in the law. Returns are assumptions, not forecasts. Speak to a qualified adviser before acting.',
+  footNotAdviceBody: 'No allowance for children, divorce, redundancy, or a change in the law. Late-life care is allowed for, but on the thinnest evidence here. Returns are assumptions, not forecasts. Speak to a qualified adviser before acting.',
   printedOn: 'Printed', summaryFor: 'Plan summary',
 },
 cs: {
@@ -2088,6 +2325,17 @@ cs: {
   jobRiskNoteLow: 'To je velký dluhopis, který už vlastníte — proto do úspor patří akcie.',
   jobRiskNoteHigh: 'Akciové riziko už nesete v práci, takže vaše úspory ho mají nést méně.',
   printBlocked: 'Použijte Ctrl+P',
+  rowCare: 'Péče ve vysokém věku, očekávaná',
+  careQ: 'Počítat s cenou péče ve vysokém věku?',
+  careHelp: 'Přibližně jeden člověk ze čtyřiceti nad 65 let žije v pobytové sociální službě a jeden z devíti nad 85 let. Plán, který to vynechá, tiše předpokládá, že se to nestane. Tady se to počítá jako očekávaný náklad — pravděpodobnost v každém věku krát to, co by rok péče stál nad rámec toho, co jste utráceli tak jako tak — a ne jako scénář, protože jde o to, co to dělá s tím, co si můžete dovolit dnes.',
+  careOff: 'Vynecháno. Všechno níž je plán za předpokladu, že péče ve vysokém věku nikdy nepřijde — což u asi čtvrtiny lidí přijde.',
+  careReadout: 'Očekávaný náklad za celý plán: <b>{cost}</b> v dnešních penězích, tedy {yr} ročně v letech, kdy k tomu dojde, nad rámec toho, co jste utráceli tak jako tak.',
+  careAllHome: 'Vaše nemovitost to pokryje celé — {home} — a přesně na to ten majetek je. Zaplatila by asi <b>{yrs} let</b> péče, proti typickému pobytu dvou až tří let.',
+  careAllHomeAmple: 'Vaše nemovitost to pokryje mnohonásobně: {home} očekávaného nákladu proti {eq} čistého majetku v nemovitosti. Péče není to, co tento plán omezuje.',
+  carePartHome: 'Vaše nemovitost pokryje {home}, tedy asi {yrs} let péče, a <b>{left}</b> zůstává na rozvaze. Typický pobyt trvá dva až tři roky.',
+  careNoHome: 'Bydlíte v nájmu, takže není co prodat: celá částka zůstává na rozvaze. Proto stojí péče nájemníka výrazně víc než vlastníka.',
+  careSourceUK: 'Prevalence: ONS Census 2021 (2,5 % osob nad 65 let, 10,8 % nad 85 let), věkový profil dopočten na oba údaje. Náklady: britský průměr 1 298 GBP týdně, 2026. V Anglii žádný celoživotní strop není.',
+  careSourceCZ: 'Výskyt: MPSV, Statistická ročenka 2024 — kolem 34 tisíc uživatelů domovů pro seniory a 25,5 tisíce domovů se zvláštním režimem na 2,24 milionu osob nad 65 let. Věkový profil je převzatý z britských dat, protože se úrovně v obou zemích shodují. Úhrada: regulovaný strop od 1. 1. 2026 (strava 290 Kč a ubytování 335 Kč denně); péči hradí příspěvek na péči.',
   rfImplied: 'Nikde se tu neptáme, jaký výnos očekávat: model si ho odvodí z toho, jak se aktiva pohybují spolu, a z této sazby. Při sazbě výše to znamená zhruba <b>{eq}</b> ročně na akciích reálně s rozptylem {sd} — což se složí na <b>{geo}</b>, tedy na číslo, se kterým spořitel doopravdy žije — a asi <b>{bond}</b> na dluhopisech. Před vašimi poplatky, a jsou to předpoklady, ne předpovědi.',
   rfSourceUK: 'Výchozí hodnota: desetiletý britský indexovaný dluhopis nesl v červnu 2026 reálně 1,68 %, zaokrouhleno dolů na 1,75 %.',
   rfSourceCZ: 'Výchozí hodnota: český trh s indexovanými dluhopisy neexistuje, takže je odvozená — desetiletý státní dluhopis kolem 4,9 % v roce 2026 proti dvouprocentnímu cíli ČNB, minus zhruba půl bodu prémie za inflační riziko. Slabší podklad než u britského čísla.',
@@ -2295,7 +2543,7 @@ cs: {
 
   footHow: 'Odkud to pochází.',
   footNotAdvice: 'Není to poradenství.',
-  footNotAdviceBody: 'Nepočítá s dětmi, rozvodem, ztrátou práce, dlouhodobou péčí ani se změnou zákonů. Výnosy jsou předpoklady, ne předpovědi. Před rozhodnutím se poraďte s odborníkem.',
+  footNotAdviceBody: 'Nepočítá s dětmi, rozvodem, ztrátou práce ani se změnou zákonů. S péčí ve vysokém věku počítá, ale na nejslabších datech, jaká tu jsou. Výnosy jsou předpoklady, ne předpovědi. Před rozhodnutím se poraďte s odborníkem.',
   printedOn: 'Vytištěno', summaryFor: 'Shrnutí plánu',
 },
 };
@@ -2338,6 +2586,10 @@ function freshState() {
        estimate". An override applies to the whole household, because it is a
        fact about the market rather than about a person. */
     loadingOverride: null,
+    /* Late-life care is charged as an expected cost. On by default, because
+       leaving it out overstates what can be spent; switchable, because it is the
+       least well evidenced figure in the tool. */
+    includeCare: true,
   };
 }
 let S = freshState();
@@ -2435,6 +2687,16 @@ function buildParams(st = S) {
     pensionTaxHaircut: C.pensionTaxHaircut,
   };
 }
+/* The care prevalence curve is fitted to two published figures using this
+   country's survival curve as the age weighting, so it has to be solved once
+   before anything asks it for a rate. Male and female averaged: the published
+   anchors are for both sexes together. */
+calibrateCare(BUILD.country, (age) => {
+  let s = 0;
+  for (const sex of [1, 2]) s += new Mortality(C.lifeTable, sex, 0).survive(65, Math.max(0, age - 65));
+  return s / 2;
+});
+
 const ctx = {
   mortalityTable: C.lifeTable,
   salaryCurve: C.salaryCurve,
@@ -2444,6 +2706,10 @@ const ctx = {
   hazard: (person, age) => disabilityRate(BUILD.country, age, person.sex, person.occClass ?? 0),
   ability: (person, age) =>
     abilityToWork(BUILD.country, person.age, age, person.sex, person.occClass ?? 0),
+  /* Long-term care. Supplying these turns the charge on at all; leaving them out
+     is how the reduction test keeps reproducing the original workbook. */
+  careRate: (age) => S.includeCare ? careRate(BUILD.country, age) : 0,
+  careNetAnnual: (essPerPerson) => careNetAnnual(BUILD.country, essPerPerson),
 };
 
 /* ------------------------------------------------------------------- rail */
@@ -2709,6 +2975,36 @@ function buildRail() {
         box.innerHTML = fill(T.rfImplied, {
           eq: pct(r.eq, 1), geo: pct(r.eqGeo, 1), sd: pct(r.sdEq, 0), bond: pct(r.bond, 1),
         }) + '<br><span style="opacity:.85">' + T[BUILD.country === 'CZ' ? 'rfSourceCZ' : 'rfSourceUK'] + '</span>';
+      };
+      box._update();
+      return box;
+    })(),
+    /* Late-life care. Charged as an expected cost, because a plan that ignores
+       it overstates what can be spent — but it rests on the thinnest data in the
+       tool, so it is switchable and the arithmetic is shown rather than implied. */
+    seg(T.careQ, [T.no, T.yes], () => S.includeCare ? 1 : 0,
+        v => S.includeCare = !!v, T.careHelp),
+    (() => {
+      const box = el('div', { class:'field readout' });
+      box._update = () => {
+        if (!S.includeCare) { box.innerHTML = T.careOff; return; }
+        const R = lastR;
+        if (!R || !Number.isFinite(R.L0CareGross)) { box.innerHTML = ''; return; }
+        const annual = careNetAnnual(BUILD.country, (S.cbar || 0) / (S.couple ? 2 : 1));
+        const years = annual > 0 ? R.careEquity / annual : 0;
+        let s = fill(T.careReadout, { cost: money(R.L0CareGross), yr: money(annual) });
+        if (R.careFromHome > 0) {
+          const key = R.L0Care > 0 ? T.carePartHome
+                    : (years > 10 ? T.careAllHomeAmple : T.careAllHome);
+          s += ' ' + fill(key, {
+            home: money(R.careFromHome), left: money(R.L0Care), eq: money(R.careEquity),
+            yrs: years.toLocaleString(C.locale, { maximumFractionDigits: 1 }),
+          });
+        } else if (!S.own) {
+          s += ' ' + T.careNoHome;
+        }
+        box.innerHTML = s + '<br><span style="opacity:.85">' +
+          T[BUILD.country === 'CZ' ? 'careSourceCZ' : 'careSourceUK'] + '</span>';
       };
       box._update();
       return box;
@@ -3401,6 +3697,7 @@ function drawBalanceSheet(R) {
     row(T.rowSavings,R.F0) + row(T.rowHC,R.H0) + row(T.rowTotal,tot,true) + '</tbody>';
   let liab = row(T.rowEss,R.L0Ess);
   if (R.L0Mort>0) liab += row(T.rowMort,R.L0Mort);
+  if (R.L0Care>0) liab += row(T.rowCare,R.L0Care);
   if (R.L0Cash>0) liab += row(T.rowBeq,R.L0Cash);
   document.getElementById('bs-liab').innerHTML =
     `<thead><tr><th></th><th>${T.value}</th><th>${T.share}</th></tr></thead><tbody>` +
@@ -3508,6 +3805,7 @@ function writeURL() {
   put('rk',S.riskPay,D.riskPay); put('sh',S.shape,D.shape); put('sm',S.smooth,D.smooth);
   put('al',S.alpha,D.alpha); put('bq',S.beqMode,D.beqMode); put('bf',S.beqFixed,D.beqFixed); put('bw',S.beqWeight,D.beqWeight);
   put('fe',S.fee,D.fee); put('rf',S.rf,D.rf); put('ma',S.maxAge,D.maxAge);
+  put('ltc',S.includeCare?1:0,D.includeCare?1:0);
   if (S.loadingOverride != null) q.set('ld', String(S.loadingOverride));
   const s = q.toString();
   /* An origin-less document — a sandboxed iframe, a data: URL, some local
@@ -3561,6 +3859,7 @@ function readURL() {
   num('sm',v=>S.smooth=v,0,2,true); num('al',v=>S.alpha=v,0,1);
   num('fe',v=>S.fee=v,0,0.03); num('rf',v=>S.rf=v,-0.02,0.08);
   num('ma',v=>S.maxAge=v,70,115,true);
+  num('ltc',v=>S.includeCare=!!v,0,1,true);
   /* Occupation and cover were household-level until they became per-person.
      Links minted before that carry the old keys; read them onto the first
      earner so a shared scenario does not quietly lose them. */

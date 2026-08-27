@@ -608,13 +608,59 @@ export class Household {
       }
     }
 
+    /* --- long-term care --------------------------------------------------
+       Charged as an expected cost rather than shown as a scenario: a plan that
+       ignores it overstates what can be spent. The charge is INCREMENTAL — a
+       resident stops paying for their own housing and food — and it is offset by
+       housing equity, but only in the states where the home is genuinely free.
+       A couple with one partner in care still needs the house.
+
+       careVec is the whole expected cost. careFree is the part of it arising in
+       states where nobody is left living in the home, which is the only part the
+       house can be sold to meet. */
+    const careVec = new Array(T + 1).fill(0);
+    const careFree = new Array(T + 1).fill(0);
+    if (this.ctx.careRate && !this.p.ignoreCare) {
+      const essPer = (this.p.cbar || 0) / this.n;
+      const net = this.ctx.careNetAnnual ? this.ctx.careNetAnnual(essPer) : 0;
+      for (let t = 0; t <= T; t++) {
+        const hh = Math.max(this.pHousehold(t), 1e-12);
+        for (let i = 0; i < this.n; i++) {
+          const rate = this.ctx.careRate(this.ageAt(i, t));
+          if (rate <= 0) continue;
+          const cost = Math.min(this.pAlive(i, t) / hh, 1) * rate * net;
+          careVec[t] += cost;
+          /* The home is free when every other member is either gone or also in
+             care. With one person that is always true. */
+          let free = 1;
+          for (let j = 0; j < this.n; j++) {
+            if (j === i) continue;
+            const aliveJ = Math.min(this.pAlive(j, t) / hh, 1);
+            free *= 1 - aliveJ * (1 - this.ctx.careRate(this.ageAt(j, t)));
+          }
+          careFree[t] += cost * free;
+        }
+      }
+    }
+    const L0CareGross = this.pdv(careVec, 0, kC);
+    const L0CareFree = this.pdv(careFree, 0, kC);
+    /* Equity available to meet care: today's, net of any already earmarked for
+       downsizing, which is a windfall on the asset side and cannot be spent
+       twice. Not discounted — it is a stock held today, not a future stream. */
+    const careEquity = H.own
+      ? Math.max(0, ((H.value || 0) - Math.max(0, H.mortgageBalance || 0))
+                    * (1 - (H.downsizeRelease || 0)))
+      : 0;
+    const careFromHome = Math.min(L0CareFree, careEquity);
+    const L0Care = Math.max(0, L0CareGross - careFromHome);
+
     // --- balance sheet ----------------------------------------------------
     const H0r = this.pdv(incVec, 0, kY);          // human capital, after tax
     const H0w = this.pdv(windfall, 0, rf);        // downsizing proceeds
     const H0 = H0r + H0w;
     const L0Ess = this.pdv(essVec, 0, kC);
     const L0Mort = this.pdv(mortVec, 0, rf);      // a contractual, riskless stream
-    const L0Risky = L0Ess + L0Mort;
+    const L0Risky = L0Ess + L0Mort + L0Care;
 
     const sav = this.p.savings;
     const F0 = sav.shares + sav.bonds + sav.cash
@@ -656,7 +702,11 @@ export class Household {
     const years = [];
     for (let t = 0; t <= T; t++) {
       const HR = this.pdv(incVec, t, kY) + this.pdv(windfall, t, rf);
-      const LR = this.pdv(essVec, t, kC) + this.pdv(mortVec, t, rf);
+      /* The remaining care liability is the gross stream from here on, less
+         whatever of the house is still available to meet it. */
+      const careLeft = Math.max(0, this.pdv(careVec, t, kC)
+        - Math.min(this.pdv(careFree, t, kC), careEquity));
+      const LR = this.pdv(essVec, t, kC) + this.pdv(mortVec, t, rf) + careLeft;
       const LC = beq * this.liPerm(t);
       const Dt = this.consumpDiv(t, h);
       const numIVA = this.ivaFn(0, t, g) * CD0;
@@ -698,6 +748,8 @@ export class Household {
 
     return {
       h, g, H0, H0r, H0w, L0, L0Risky, L0Ess, L0Mort, L0Cash, F0, W0, w0SansLI,
+      // Long-term care: what it costs, and how much of it the house absorbs.
+      L0Care, L0CareGross, careFromHome, careEquity,
       D0, CD0, beq, maxBeq, beqDiv, liPerm0, mortgagePayment: mPay,
       retYear: this.retYear, maxYear: T, baseAge: this.baseAge,
       years, cma: this.cma, muIVA, sigmaIVA,

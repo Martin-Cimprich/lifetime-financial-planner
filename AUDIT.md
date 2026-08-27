@@ -325,3 +325,55 @@ it.
 | CZ default household, spending | 59,295 Kč/yr | 63,154 Kč/yr |
 | implied real return on shares | not stated anywhere | stated on screen, 4.2% (UK) |
 | `test-countries.mjs` | 7 checks could fail silently | all counted |
+
+
+---
+
+# Round five — long-term care, and a Czech transfer counted twice
+
+The last item in `INSURANCE-DESIGN.md`'s "one caution" list, built rather than deferred.
+
+**A first pass credited příspěvek na péči against the wrong charge.** The Czech care allowance
+is paid to the facility for the *care* component, which is billed separately from board and
+accommodation. Netting it off the board charge as well made the Czech net cost of a year in
+care come out at exactly zero — which looked plausible, since Czech care genuinely is largely
+covered, and would have quietly removed the entire liability from every Czech plan. The care
+component is now excluded from the gross figure rather than deducted from it, which is the
+same thing done correctly, and a year in care costs 72,125 CZK on top of ordinary essentials.
+
+**The prevalence curve is fitted, not transcribed, and that is stated.** Only two figures are
+published for the UK — 2.5% of over-65s and 10.8% of over-85s — which is enough to pin two
+parameters and nothing more. An exponential in age is solved against both, using the country's
+own life table as the age weighting rather than today's population, because the curve is
+applied to the model's own projected survival path. It reproduces 2.49% and 10.72%, both
+asserted. It also means the curve is a smooth extrapolation where reality is not, and the copy
+does not pretend otherwise.
+
+**The Czech level was derived and then cross-checked against the UK.** MPSV's 2024 yearbook
+gives roughly 34,000 users of domovy pro seniory and 25,500 of domovy se zvláštním režimem;
+against a 65+ population near 2.24 million that is about 2.4%, against the UK's 2.5%. Two
+completely different care systems and two independent statistical offices, agreeing to a
+tenth of a percentage point. That agreement is the only reason the UK age shape is used for
+both, and it is the same kind of cross-check that validated the disability incidence data.
+
+**"48.5 years of care."** The readout divides housing equity by the annual cost to say how
+long the house would last. On the Czech defaults that is 3.5 million CZK against 72,125 a
+year, and the sentence read "it would pay for about 48.5 years of care, against a typical stay
+of two to three" — arithmetically correct and useless, with an English decimal point in the
+Czech build. Above ten years the years figure is not the binding constraint, and the copy now
+says that instead of quoting it.
+
+## What it changed
+
+| | before | after |
+|---|---|---|
+| UK owner, spending | £8,577/yr | £8,577/yr — the house absorbs it |
+| UK renter at 35, spending | £12,135/yr | £11,461/yr (−5.6%) |
+| UK renter at 60 / at 75 | — | −14.9% / −26.1% |
+| CZ renter at 35, spending | 134,229 Kč/yr | 133,117 Kč/yr (−0.8%) |
+| a year in care, vs a year's essentials | not modelled | UK 3.57× · CZ 0.30× |
+
+The gap between those last two numbers is the whole point. The English exposure is uncapped
+and runs to the estate; the Czech one is a regulated charge largely met by the pension and the
+care allowance. Any model that treated them the same would be wrong about the more important
+of the two.
